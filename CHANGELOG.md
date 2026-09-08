@@ -20,6 +20,27 @@ All notable changes to this project are documented here. The format follows
 - Removed the library screenshot from the README: it showed generations made
   from Italian prompts, which reads as an accident in an English repository.
 
+## [1.3.1] - 2026-09-08
+
+### Changed
+
+- The README opens on what the project is for rather than on a feature list,
+  with real screenshots of the running app, an Italian translation alongside,
+  and a hand-drawn SVG hero.
+- CI and releases are separate workflows. The single one rebuilt installers on
+  every push and published them only on a tag, which made the release path
+  something that had never run before it mattered. The release job now refuses a
+  tag whose version disagrees with package.json and takes its notes from the
+  changelog section for that version.
+
+### Fixed
+
+- A field cut by the edge of the scrolling panel read as a broken layout rather
+  than as more content below. The boundary above the run bar is marked now.
+- A patch had stripped the dollar sign from the model price, which read as a
+  bare "9.58". The self-check asserts that every price the interface shows
+  carries a currency.
+
 ## [1.3.0] - 2026-09-08
 
 The interface speaks seven languages, and the repository moved to Apache 2.0.
