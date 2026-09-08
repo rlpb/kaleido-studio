@@ -4,6 +4,7 @@ import type { LibraryItem, MediaKind, ModeId } from '../lib/types';
 import { MODES } from '../lib/modes';
 import { formatBytes, formatCost } from '../lib/pricing';
 import { MediaCard, MediaViewer, type MediaRef } from '../components/MediaCard';
+import Icon from '../components/Icon';
 
 type Push = (text: string, tone?: 'info' | 'ok' | 'error') => void;
 
@@ -18,7 +19,12 @@ export default function LibraryScreen({ push }: { push: Push }) {
   const [favoritesOnly, setFavoritesOnly] = useState(false);
   const [limit, setLimit] = useState(PAGE);
   const [viewing, setViewing] = useState<MediaRef | null>(null);
-  const [stats, setStats] = useState<{ count: number; byKind: Record<string, number>; totalCost: number; bytes: number } | null>(null);
+  const [stats, setStats] = useState<{
+    count: number;
+    byKind: Record<string, number>;
+    totalCost: number;
+    bytes: number;
+  } | null>(null);
 
   const load = useCallback(async () => {
     const result = await bridge.library.list({ search, mode, kind, favoritesOnly, limit, offset: 0 });
@@ -36,22 +42,23 @@ export default function LibraryScreen({ push }: { push: Push }) {
   return (
     <>
       <div className="topbar">
-        <h1>Libreria</h1>
+        <h1>Library</h1>
         <span className="faint">
-          {total} element{total === 1 ? 'o' : 'i'}
-          {total !== stats?.count ? ` su ${stats?.count ?? 0}` : ''}
+          {total} item{total === 1 ? '' : 's'}
+          {stats && total !== stats.count ? ` of ${stats.count}` : ''}
         </span>
         <div className="spacer" />
         <button
           className="btn btn-ghost btn-sm"
-          title="Rimuove dall'indice i file cancellati fuori dall'app"
+          title="Drops index entries whose file was deleted outside the app"
           onClick={async () => {
             const removed = await bridge.library.prune();
-            push(removed ? `${removed} voci orfane rimosse` : 'Nessuna voce orfana', 'ok');
+            push(removed ? `${removed} orphaned entries removed` : 'No orphaned entries', 'ok');
             void load();
           }}
         >
-          Ripulisci indice
+          <Icon name="refresh" />
+          Clean index
         </button>
       </div>
 
@@ -60,34 +67,37 @@ export default function LibraryScreen({ push }: { push: Push }) {
           <div className="stat-grid">
             <div className="stat">
               <div className="value mono">{stats.count}</div>
-              <div className="label">File totali</div>
+              <div className="label">Files</div>
             </div>
             <div className="stat">
               <div className="value mono">{formatCost(stats.totalCost)}</div>
-              <div className="label">Costo cumulato</div>
+              <div className="label">Cumulative cost</div>
             </div>
             <div className="stat">
               <div className="value mono">{formatBytes(stats.bytes)}</div>
-              <div className="label">Spazio su disco</div>
+              <div className="label">Disk usage</div>
             </div>
             <div className="stat">
               <div className="value mono">
                 {stats.byKind.image ?? 0}/{stats.byKind.video ?? 0}/{stats.byKind.audio ?? 0}
               </div>
-              <div className="label">Immagini / video / audio</div>
+              <div className="label">Images / video / audio</div>
             </div>
           </div>
         )}
 
         <div className="toolbar">
-          <input
-            type="search"
-            placeholder="Cerca nel prompt, nel modello, nel testo…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+          <div className="input-with-icon">
+            <Icon name="search" />
+            <input
+              type="search"
+              placeholder="Search prompts, models, transcripts…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
           <select value={mode} onChange={(e) => setMode(e.target.value as ModeId | 'all')}>
-            <option value="all">Tutte le modalità</option>
+            <option value="all">All modes</option>
             {MODES.map((m) => (
               <option key={m.id} value={m.id}>
                 {m.label}
@@ -95,22 +105,22 @@ export default function LibraryScreen({ push }: { push: Push }) {
             ))}
           </select>
           <select value={kind} onChange={(e) => setKind(e.target.value as MediaKind | 'all')}>
-            <option value="all">Tutti i tipi</option>
-            <option value="image">Immagini</option>
+            <option value="all">All types</option>
+            <option value="image">Images</option>
             <option value="video">Video</option>
             <option value="audio">Audio</option>
-            <option value="text">Testo</option>
+            <option value="text">Text</option>
           </select>
           <label className="switch">
             <input type="checkbox" checked={favoritesOnly} onChange={(e) => setFavoritesOnly(e.target.checked)} />
-            <span className="muted">Solo preferiti</span>
+            <span className="muted">Favourites only</span>
           </label>
         </div>
 
         {items.length === 0 ? (
           <div className="empty">
-            <div className="glyph">◫</div>
-            <div>Nessun risultato</div>
+            <Icon name="library" size={30} />
+            <div>Nothing here yet</div>
           </div>
         ) : (
           <>
@@ -127,19 +137,19 @@ export default function LibraryScreen({ push }: { push: Push }) {
                   }}
                   onUsePrompt={(prompt) => {
                     void navigator.clipboard.writeText(prompt);
-                    push('Prompt copiato negli appunti', 'ok');
+                    push('Prompt copied to the clipboard', 'ok');
                   }}
                   onDelete={async (ref) => {
                     await bridge.library.remove(ref.id);
-                    push('Elemento eliminato', 'ok');
+                    push('Item deleted', 'ok');
                     void load();
                   }}
                 />
               ))}
             </div>
             {items.length < total && (
-              <button className="btn" style={{ alignSelf: 'center' }} onClick={() => setLimit((l) => l + PAGE)}>
-                Carica altri {Math.min(PAGE, total - items.length)}
+              <button className="btn self-center" onClick={() => setLimit((l) => l + PAGE)}>
+                Load {Math.min(PAGE, total - items.length)} more
               </button>
             )}
           </>

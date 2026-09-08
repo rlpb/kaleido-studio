@@ -4,7 +4,7 @@
  * expects, and the cost estimator only quotes numbers it can defend.
  *
  * Run with: npm run check
- * Needs network access. No API key required, the catalog routes are public.
+ * Needs network access. No API key required: the catalog routes are public.
  */
 import assert from 'node:assert/strict';
 import { build } from 'esbuild';
@@ -43,91 +43,91 @@ async function load(entry, name) {
 const api = await load('electron/openrouter.ts', 'openrouter');
 const pricing = await load('src/lib/pricing.ts', 'pricing');
 
-console.log('\nCatalogo OpenRouter');
+console.log('\nOpenRouter catalog');
 const catalog = await api.fetchCatalog(null);
 const modes = ['image', 'image-edit', 'video', 'video-from-image', 'video-upscale', 'speech', 'transcribe', 'audio'];
 
-await check('ogni modalità ha almeno un modello', () => {
+await check('every mode has at least one model', () => {
   for (const mode of modes) {
     const list = catalog.models[mode];
-    assert.ok(Array.isArray(list), `${mode} non è un array`);
-    assert.ok(list.length > 0, `${mode} è vuota: l'API ha cambiato forma`);
+    assert.ok(Array.isArray(list), `${mode} is not an array`);
+    assert.ok(list.length > 0, `${mode} is empty: the API changed shape`);
   }
   console.log('       ' + modes.map((m) => `${m}=${catalog.models[m].length}`).join(' '));
 });
 
-await check('ogni ParamSpec è utilizzabile da un form', () => {
+await check('every ParamSpec is usable by a form', () => {
   for (const mode of modes) {
     for (const model of catalog.models[mode]) {
       for (const spec of model.params) {
-        assert.ok(spec.key && spec.label, `${model.id}: spec senza key o label`);
+        assert.ok(spec.key && spec.label, `${model.id}: spec without key or label`);
         if (spec.kind === 'enum') {
-          assert.ok(Array.isArray(spec.values) && spec.values.length > 0, `${model.id}.${spec.key}: enum vuoto`);
+          assert.ok(Array.isArray(spec.values) && spec.values.length > 0, `${model.id}.${spec.key}: empty enum`);
           assert.ok(
             spec.values.every((v) => typeof v === 'string'),
-            `${model.id}.${spec.key}: valori non stringa`,
+            `${model.id}.${spec.key}: non-string values`,
           );
         }
         if (spec.kind === 'int' || spec.kind === 'number') {
-          assert.ok(Number.isFinite(spec.min) && Number.isFinite(spec.max), `${model.id}.${spec.key}: range non numerico`);
-          assert.ok(spec.min <= spec.max, `${model.id}.${spec.key}: min maggiore di max`);
+          assert.ok(Number.isFinite(spec.min) && Number.isFinite(spec.max), `${model.id}.${spec.key}: non-numeric range`);
+          assert.ok(spec.min <= spec.max, `${model.id}.${spec.key}: min greater than max`);
         }
       }
     }
   }
 });
 
-await check('i modelli video espongono durata e tariffa al secondo', () => {
+await check('video models expose a duration and a per-second rate', () => {
   const withRate = catalog.models.video.filter((m) => Object.keys(m.price.perVideoSecond ?? {}).length > 0);
-  assert.ok(withRate.length > 0, 'nessun modello video ha pricing_skus riconosciuti');
+  assert.ok(withRate.length > 0, 'no video model has recognised pricing_skus');
   const withDuration = catalog.models.video.filter((m) => m.params.some((p) => p.key === 'duration'));
-  assert.ok(withDuration.length > 0, 'nessun modello video espone la durata');
+  assert.ok(withDuration.length > 0, 'no video model exposes a duration');
 });
 
-await check('i modelli immagine espongono almeno un parametro', () => {
+await check('image models expose at least one parameter', () => {
   const withParams = catalog.models.image.filter((m) => m.params.length > 0);
-  assert.ok(withParams.length > 0, 'nessun modello immagine ha supported_parameters riconosciuti');
+  assert.ok(withParams.length > 0, 'no image model has recognised supported_parameters');
 });
 
-await check('la modalità modifica immagini accetta riferimenti', () => {
+await check('the image editing mode only holds models that take references', () => {
   for (const model of catalog.models['image-edit']) {
-    assert.ok(model.maxReferences > 0, `${model.id} è in image-edit ma non accetta riferimenti`);
+    assert.ok(model.maxReferences > 0, `${model.id} is in image-edit but takes no references`);
   }
 });
 
-await check('le voci TTS arrivano dal catalogo', () => {
+await check('TTS voices come from the catalog', () => {
   const withVoices = catalog.models.speech.filter((m) => m.params.some((p) => p.key === 'voice'));
-  assert.ok(withVoices.length > 0, 'nessun modello speech espone voci selezionabili');
+  assert.ok(withVoices.length > 0, 'no speech model exposes selectable voices');
 });
 
-console.log('\nStima dei costi');
+console.log('\nCost estimates');
 
-await check('il video si stima a listino, non a occhio', () => {
+await check('video is estimated from the list price, not guessed', () => {
   const model = catalog.models.video.find((m) => Object.keys(m.price.perVideoSecond ?? {}).length > 0);
   const resolution = Object.keys(model.price.perVideoSecond).find((k) => k !== 'default') ?? 'default';
   const rate = model.price.perVideoSecond[resolution];
   const est = pricing.estimateCost(model, { resolution, duration: 5 }, 2, {});
-  assert.equal(est.basis, 'listino');
-  assert.ok(Math.abs(est.total - rate * 5 * 2) < 1e-9, `atteso ${rate * 5 * 2}, ottenuto ${est.total}`);
+  assert.equal(est.basis, 'list price');
+  assert.ok(Math.abs(est.total - rate * 5 * 2) < 1e-9, `expected ${rate * 5 * 2}, got ${est.total}`);
 });
 
-await check('senza dati non inventa una cifra', () => {
+await check('with no data it invents no figure', () => {
   const model = catalog.models.image.find((m) => !m.price.free);
   const est = pricing.estimateCost(model, { aspect_ratio: '1:1' }, 1, {});
-  assert.equal(est.total, null, 'ha prodotto un numero che non poteva conoscere');
-  assert.equal(est.basis, 'sconosciuto');
+  assert.equal(est.total, null, 'it produced a number it could not know');
+  assert.equal(est.basis, 'unknown');
 });
 
-await check('un costo già osservato diventa la stima', () => {
+await check('an already observed cost becomes the estimate', () => {
   const model = catalog.models.image.find((m) => !m.price.free);
   const params = { aspect_ratio: '1:1', resolution: '1K' };
   const key = pricing.costKeyFor(model.id, params);
   const est = pricing.estimateCost(model, params, 3, { [key]: 0.04 });
-  assert.equal(est.basis, 'misurato');
+  assert.equal(est.basis, 'measured');
   assert.ok(Math.abs(est.total - 0.12) < 1e-9);
 });
 
-await check('la firma di costo ignora i parametri che non spostano il prezzo', () => {
+await check('the cost signature ignores parameters that do not move the price', () => {
   const a = pricing.costKeyFor('x/y', { resolution: '2K', seed: 1 });
   const b = pricing.costKeyFor('x/y', { resolution: '2K', seed: 999 });
   assert.equal(a, b);
@@ -137,7 +137,7 @@ await check('la firma di costo ignora i parametri che non spostano il prezzo', (
 rmSync(outDir, { recursive: true, force: true });
 
 if (failures > 0) {
-  console.error(`\n${failures} controlli falliti\n`);
+  console.error(`\n${failures} checks failed\n`);
   process.exit(1);
 }
-console.log('\nTutti i controlli superati\n');
+console.log('\nAll checks passed\n');

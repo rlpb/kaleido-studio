@@ -6,6 +6,10 @@ const APP_HEADERS = {
   'X-Title': 'Kaleido Studio',
 };
 
+/** Catalog reads are quick; generation holds the connection while the model works. */
+const CATALOG_TIMEOUT_MS = 60_000;
+const GENERATION_TIMEOUT_MS = 10 * 60_000;
+
 export class OpenRouterError extends Error {
   constructor(
     message: string,
@@ -17,10 +21,77 @@ export class OpenRouterError extends Error {
   }
 }
 
+/**
+ * A transport failure, as opposed to a request the server answered and rejected.
+ *
+ * `fetch` reports every one of these as the same opaque "fetch failed", and puts
+ * the reason that actually identifies the problem in a nested `cause`. Reporting
+ * the message alone tells the user nothing and tells a bug report even less, so
+ * the chain is unwound here into something nameable.
+ */
+export class NetworkError extends Error {
+  constructor(
+    message: string,
+    readonly detail: string,
+  ) {
+    super(message);
+    this.name = 'NetworkError';
+  }
+}
+
+/** Walks the cause chain and collects every error code and message in it. */
+function describeCause(err: unknown): string {
+  const parts: string[] = [];
+  let current: any = err;
+  const seen = new Set<unknown>();
+  while (current && typeof current === 'object' && !seen.has(current)) {
+    seen.add(current);
+    const code = current.code ?? current.errno;
+    if (code) parts.push(String(code));
+    else if (current.message && current.message !== 'fetch failed') parts.push(String(current.message));
+    current = current.cause;
+  }
+  return parts.join(' <- ');
+}
+
+const NETWORK_HINTS: Record<string, string> = {
+  ENOTFOUND: 'openrouter.ai could not be resolved. Check the DNS settings or the connection.',
+  EAI_AGAIN: 'DNS lookup for openrouter.ai timed out. The connection may be down.',
+  ECONNREFUSED: 'The connection was refused, which usually means a proxy or firewall blocked it.',
+  ECONNRESET: 'The connection was closed mid-request, often by a proxy, a VPN or antivirus TLS inspection.',
+  ETIMEDOUT: 'The connection timed out before the server answered.',
+  EPROTO: 'The TLS handshake failed. A proxy or antivirus intercepting HTTPS is the usual cause.',
+  CERT_HAS_EXPIRED: 'The TLS certificate was rejected, which points at an intercepting proxy.',
+  UNABLE_TO_VERIFY_LEAF_SIGNATURE: 'The TLS certificate could not be verified, which points at an intercepting proxy.',
+  UND_ERR_CONNECT_TIMEOUT: 'Opening the connection to openrouter.ai timed out.',
+  UND_ERR_HEADERS_TIMEOUT: 'The server accepted the request but sent no response in time.',
+  UND_ERR_SOCKET: 'The socket closed unexpectedly, often a proxy or VPN cutting the connection.',
+};
+
+function networkError(err: unknown, timeoutMs: number): NetworkError {
+  if (err instanceof Error && err.name === 'TimeoutError') {
+    const seconds = Math.round(timeoutMs / 1000);
+    return new NetworkError(`The request timed out after ${seconds}s without a response.`, 'TimeoutError');
+  }
+  const detail = describeCause(err) || 'unknown cause';
+  const hint = Object.keys(NETWORK_HINTS).find((code) => detail.includes(code));
+  const explanation = hint ? NETWORK_HINTS[hint] : 'The request never reached OpenRouter.';
+  return new NetworkError(`${explanation} (${detail})`, detail);
+}
+
 function headers(key: string | null, extra: Record<string, string> = {}): Record<string, string> {
   const h: Record<string, string> = { ...APP_HEADERS, ...extra };
   if (key) h.Authorization = `Bearer ${key}`;
   return h;
+}
+
+/** Every request goes through here so no transport failure is reported bare. */
+async function send(url: string, init: RequestInit, timeoutMs: number): Promise<Response> {
+  try {
+    return await fetch(url, { ...init, signal: AbortSignal.timeout(timeoutMs) });
+  } catch (err) {
+    throw networkError(err, timeoutMs);
+  }
 }
 
 /**
@@ -28,43 +99,53 @@ function headers(key: string | null, extra: Record<string, string> = {}): Record
  * payload is inspected even when the HTTP status looks fine.
  */
 async function readJson(res: Response): Promise<any> {
-  const text = await res.text();
+  let text: string;
+  try {
+    text = await res.text();
+  } catch (err) {
+    // The connection can still drop while the body streams in, which is a
+    // different failure from one that never got a response at all.
+    throw new NetworkError(
+      `The connection dropped while the response was still downloading. (${describeCause(err) || 'unknown cause'})`,
+      describeCause(err),
+    );
+  }
+
   let body: any = null;
   if (text) {
     try {
       body = JSON.parse(text);
     } catch {
-      throw new OpenRouterError(res.ok ? 'Risposta non in formato JSON' : text.slice(0, 400), res.status);
+      throw new OpenRouterError(res.ok ? 'The response was not valid JSON.' : text.slice(0, 400), res.status);
     }
   }
   if (!res.ok || body?.error) {
-    const msg = body?.error?.message ?? body?.detail ?? res.statusText ?? 'Richiesta fallita';
+    const msg = body?.error?.message ?? body?.detail ?? res.statusText ?? 'The request failed.';
     throw new OpenRouterError(String(msg), res.status, body?.error?.code);
   }
   return body;
 }
 
 async function get(path: string, key: string | null): Promise<any> {
-  const res = await fetch(`${BASE}${path}`, { headers: headers(key) });
-  return readJson(res);
+  return readJson(await send(`${BASE}${path}`, { headers: headers(key) }, CATALOG_TIMEOUT_MS));
 }
 
 async function post(path: string, key: string, body: unknown): Promise<any> {
-  const res = await fetch(`${BASE}${path}`, {
-    method: 'POST',
-    headers: headers(key, { 'Content-Type': 'application/json' }),
-    body: JSON.stringify(body),
-  });
+  const res = await send(
+    `${BASE}${path}`,
+    { method: 'POST', headers: headers(key, { 'Content-Type': 'application/json' }), body: JSON.stringify(body) },
+    GENERATION_TIMEOUT_MS,
+  );
   return readJson(res);
 }
 
 /** Posts to an endpoint that answers with raw bytes, such as speech synthesis. */
 async function postBytes(path: string, key: string, body: unknown): Promise<{ bytes: Buffer; mediaType: string }> {
-  const res = await fetch(`${BASE}${path}`, {
-    method: 'POST',
-    headers: headers(key, { 'Content-Type': 'application/json' }),
-    body: JSON.stringify(body),
-  });
+  const res = await send(
+    `${BASE}${path}`,
+    { method: 'POST', headers: headers(key, { 'Content-Type': 'application/json' }), body: JSON.stringify(body) },
+    GENERATION_TIMEOUT_MS,
+  );
   const mediaType = res.headers.get('content-type') ?? 'application/octet-stream';
   if (!res.ok || mediaType.includes('application/json')) {
     const text = await res.text();
@@ -80,8 +161,8 @@ async function postBytes(path: string, key: string, body: unknown): Promise<{ by
 }
 
 export async function getBytes(url: string, key: string): Promise<{ bytes: Buffer; mediaType: string }> {
-  const res = await fetch(url, { headers: headers(key) });
-  if (!res.ok) throw new OpenRouterError(`Download fallito (${res.status})`, res.status);
+  const res = await send(url, { headers: headers(key) }, GENERATION_TIMEOUT_MS);
+  if (!res.ok) throw new OpenRouterError(`Download failed (${res.status}).`, res.status);
   return {
     bytes: Buffer.from(await res.arrayBuffer()),
     mediaType: res.headers.get('content-type') ?? 'application/octet-stream',
@@ -124,25 +205,25 @@ export async function getCredits(key: string): Promise<{ total: number; used: nu
 // ---------------------------------------------------------------------------
 
 const PARAM_LABELS: Record<string, string> = {
-  aspect_ratio: 'Formato',
-  resolution: 'Risoluzione',
-  size: 'Dimensioni',
-  quality: 'Qualità',
-  output_format: 'Formato file',
-  output_compression: 'Compressione',
-  background: 'Sfondo',
-  n: 'Immagini per richiesta',
+  aspect_ratio: 'Aspect ratio',
+  resolution: 'Resolution',
+  size: 'Size',
+  quality: 'Quality',
+  output_format: 'File format',
+  output_compression: 'Compression',
+  background: 'Background',
+  n: 'Images per request',
   seed: 'Seed',
-  duration: 'Durata (secondi)',
-  generate_audio: 'Genera audio',
-  upscale_factor: 'Fattore di ingrandimento',
-  creativity: 'Creatività',
-  voice: 'Voce',
-  speed: 'Velocità',
-  response_format: 'Formato risposta',
-  language: 'Lingua',
-  temperature: 'Temperatura',
-  word_timestamps: 'Timestamp per parola',
+  duration: 'Duration (seconds)',
+  generate_audio: 'Generate audio',
+  upscale_factor: 'Upscale factor',
+  creativity: 'Creativity',
+  voice: 'Voice',
+  speed: 'Speed',
+  response_format: 'Response format',
+  language: 'Language',
+  temperature: 'Temperature',
+  word_timestamps: 'Word-level timestamps',
 };
 
 const label = (key: string) => PARAM_LABELS[key] ?? key.replace(/_/g, ' ');
@@ -193,7 +274,11 @@ function imageParams(sp: Record<string, any> | undefined): { params: ParamSpec[]
     if (spec?.type === 'enum' && Array.isArray(spec.values)) {
       params.push({ key, label: label(key), kind: 'enum', values: spec.values.map(String) });
     } else if (spec?.type === 'range') {
-      params.push({ key, label: label(key), kind: 'int', min: Number(spec.min ?? 0), max: Number(spec.max ?? 1) });
+      const min = Number(spec.min ?? 0);
+      const max = Number(spec.max ?? 1);
+      // A range with a single admissible value is a control nobody can move.
+      if (min >= max) continue;
+      params.push({ key, label: label(key), kind: 'int', min, max });
     } else if (spec?.type === 'boolean') {
       params.push({ key, label: label(key), kind: 'bool' });
     }
@@ -232,7 +317,7 @@ function videoParams(entry: any): ParamSpec[] {
       kind: 'enum',
       values: durations.map(String),
       default: String(durations[0]),
-      help: 'Il costo cresce in proporzione alla durata.',
+      help: 'Cost scales directly with duration.',
     });
   }
   if (entry.generate_audio) {
@@ -259,7 +344,7 @@ function videoParams(entry: any): ParamSpec[] {
       kind: 'int',
       min: 0,
       max: 2147483647,
-      help: 'Stesso seed e stesso prompt danno lo stesso risultato.',
+      help: 'The same seed and prompt reproduce the same result.',
     });
   }
   return params;
@@ -297,7 +382,7 @@ function speechParams(entry: any): ParamSpec[] {
     max: 4,
     step: 0.05,
     default: 1,
-    help: 'Applicata solo dai modelli che la supportano, altrimenti ignorata.',
+    help: 'Applied only by models that support it, ignored by the rest.',
   });
   return params;
 }
@@ -308,7 +393,7 @@ function transcribeParams(): ParamSpec[] {
       key: 'language',
       label: label('language'),
       kind: 'text',
-      placeholder: 'it, en, ja… (vuoto = rilevamento automatico)',
+      placeholder: 'en, it, ja… (empty means auto-detect)',
     },
     {
       key: 'response_format',
@@ -322,7 +407,7 @@ function transcribeParams(): ParamSpec[] {
       label: label('word_timestamps'),
       kind: 'bool',
       default: false,
-      help: 'Richiede il formato verbose_json e un provider compatibile OpenAI.',
+      help: 'Requires the verbose_json format and an OpenAI-compatible provider.',
     },
     { key: 'temperature', label: label('temperature'), kind: 'number', min: 0, max: 1, step: 0.05, default: 0 },
   ];
@@ -442,7 +527,7 @@ export async function createImages(key: string, body: Record<string, unknown>): 
 
 export async function createVideo(key: string, body: Record<string, unknown>): Promise<{ id: string; status: string }> {
   const res = await post('/videos', key, body);
-  if (!res?.id) throw new OpenRouterError('Il servizio non ha restituito un id di lavorazione', 502);
+  if (!res?.id) throw new OpenRouterError('The service returned no job id.', 502);
   return { id: String(res.id), status: String(res.status ?? 'pending') };
 }
 

@@ -1,0 +1,35 @@
+name: Bug report
+description: Something does not work
+labels: [bug]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you did, what you expected, what you got instead.
+    validations:
+      required: true
+  - type: input
+    id: mode
+    attributes:
+      label: Mode and model
+      description: Which screen, and the model id shown under its name.
+      placeholder: Images / x-ai/grok-imagine-image-2.0
+    validations:
+      required: true
+  - type: textarea
+    id: error
+    attributes:
+      label: Exact error text
+      description: >
+        Copy it verbatim from the error card or the toast. Network errors carry a
+        cause code such as ECONNRESET; keep it, it identifies the problem.
+      render: text
+  - type: input
+    id: version
+    attributes:
+      label: Version and platform
+      description: From Settings, About.
+      placeholder: 1.1.0, Windows 11
+    validations:
+      required: true

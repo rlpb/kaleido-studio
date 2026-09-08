@@ -97,14 +97,14 @@ const ajv = new Ajv({ allErrors: true, strict: false, verbose: false });
 const validate = ajv.compile(schema);
 
 if (validate(config)) {
-  console.log('electron-builder.yml valido secondo lo schema di app-builder-lib');
+  console.log('electron-builder.yml is valid against the app-builder-lib schema');
   process.exit(0);
 }
 
-console.error('electron-builder.yml non valido:\n');
+console.error('electron-builder.yml is invalid:\n');
 for (const error of validate.errors ?? []) {
-  const where = error.instancePath || '(radice)';
-  const extra = error.params?.additionalProperty ? ` -> chiave sconosciuta "${error.params.additionalProperty}"` : '';
+  const where = error.instancePath || '(root)';
+  const extra = error.params?.additionalProperty ? ` -> unknown key "${error.params.additionalProperty}"` : '';
   console.error(`  ${where} ${error.message}${extra}`);
 }
 console.error('');

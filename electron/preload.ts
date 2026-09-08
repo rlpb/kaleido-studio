@@ -10,7 +10,7 @@ interface Envelope<T> {
 /** Unwraps the main-process envelope so callers see a value or an exception. */
 async function call<T>(channel: string, ...args: unknown[]): Promise<T> {
   const res = (await ipcRenderer.invoke(channel, ...args)) as Envelope<T>;
-  if (!res.ok) throw new Error(res.error ?? 'Operazione fallita');
+  if (!res.ok) throw new Error(res.error ?? 'The operation failed');
   return res.data as T;
 }
 

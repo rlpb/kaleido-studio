@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { bridge, type KeyState } from './lib/api';
 import type { Catalog, Job, ModeId, Settings } from './lib/types';
 import { MODES } from './lib/modes';
-import { formatCost } from './lib/pricing';
+import { formatMoney } from './lib/pricing';
+import Icon, { type IconName } from './components/Icon';
 import Onboarding from './screens/Onboarding';
 import Studio from './screens/Studio';
 import LibraryScreen from './screens/LibraryScreen';
@@ -11,15 +12,15 @@ import { ToastStack, useToasts } from './components/Toasts';
 
 type Route = { kind: 'studio'; mode: ModeId } | { kind: 'library' } | { kind: 'settings' };
 
-const MODE_GLYPHS: Record<ModeId, string> = {
-  image: '▣',
-  'image-edit': '✦',
-  video: '▶',
-  'video-from-image': '⏩',
-  'video-upscale': '⤢',
-  speech: '◍',
-  audio: '♪',
-  transcribe: '⌯',
+const MODE_ICONS: Record<ModeId, IconName> = {
+  image: 'image',
+  'image-edit': 'imageEdit',
+  video: 'video',
+  'video-from-image': 'imageToVideo',
+  'video-upscale': 'upscale',
+  speech: 'speech',
+  audio: 'music',
+  transcribe: 'transcript',
 };
 
 export default function App() {
@@ -73,17 +74,14 @@ export default function App() {
   }, [settings]);
 
   // --- catalog ------------------------------------------------------------
-  const loadCatalog = useCallback(
-    async (force = false) => {
-      setCatalogError(null);
-      try {
-        setCatalog(await bridge.catalog.get(force));
-      } catch (err) {
-        setCatalogError(err instanceof Error ? err.message : String(err));
-      }
-    },
-    [],
-  );
+  const loadCatalog = useCallback(async (force = false) => {
+    setCatalogError(null);
+    try {
+      setCatalog(await bridge.catalog.get(force));
+    } catch (err) {
+      setCatalogError(err instanceof Error ? err.message : String(err));
+    }
+  }, []);
 
   useEffect(() => {
     if (keyState?.valid) void loadCatalog();
@@ -97,7 +95,7 @@ export default function App() {
         const next = current.filter((j) => j.id !== job.id);
         return [job, ...next].sort((a, b) => b.createdAt - a.createdAt);
       });
-      if (job.status === 'error') push(`${job.modelName}: ${job.error ?? 'errore'}`, 'error');
+      if (job.status === 'error') push(`${job.modelName}: ${job.error ?? 'failed'}`, 'error');
     });
   }, [push]);
 
@@ -125,7 +123,7 @@ export default function App() {
       <div className="onboarding">
         <div className="row">
           <div className="spin" />
-          <span className="muted">Avvio di Kaleido…</span>
+          <span className="muted">Starting Kaleido…</span>
         </div>
       </div>
     );
@@ -141,21 +139,22 @@ export default function App() {
   }
 
   const activeJobs = jobs.filter((j) => j.status === 'queued' || j.status === 'running').length;
+  const balance = keyState.credits
+    ? Math.max(0, keyState.credits.total - keyState.credits.used)
+    : (keyState.limitRemaining ?? null);
 
   return (
     <div className="shell">
       <aside className="sidebar">
         <div className="brand">
           <div className="brand-mark" />
-          <div>
+          <div className="brand-text">
             <div className="brand-name">Kaleido</div>
-            <div className="faint" style={{ fontSize: 10.5 }}>
-              Studio media
-            </div>
+            <div className="brand-sub">Media studio</div>
           </div>
         </div>
 
-        <div className="section-title">Genera</div>
+        <div className="section-title">Generate</div>
         {MODES.map((mode) => {
           const count = catalog?.models[mode.id]?.length ?? 0;
           const active = route.kind === 'studio' && route.mode === mode.id;
@@ -170,9 +169,9 @@ export default function App() {
               title={mode.hint}
               disabled={catalog !== null && count === 0}
             >
-              <span className="glyph">{MODE_GLYPHS[mode.id]}</span>
-              <span>{mode.label}</span>
-              <span className="nav-count">{catalog ? count : '·'}</span>
+              <Icon name={MODE_ICONS[mode.id]} />
+              <span className="nav-label">{mode.label}</span>
+              <span className="nav-count">{catalog ? count : ''}</span>
             </button>
           );
         })}
@@ -182,31 +181,25 @@ export default function App() {
             className={`nav-item${route.kind === 'library' ? ' active' : ''}`}
             onClick={() => setRoute({ kind: 'library' })}
           >
-            <span className="glyph">◫</span>
-            <span>Libreria</span>
+            <Icon name="library" />
+            <span className="nav-label">Library</span>
           </button>
           <button
             className={`nav-item${route.kind === 'settings' ? ' active' : ''}`}
             onClick={() => setRoute({ kind: 'settings' })}
           >
-            <span className="glyph">⚙</span>
-            <span>Impostazioni</span>
+            <Icon name="settings" />
+            <span className="nav-label">Settings</span>
           </button>
 
           <div className="balance">
             <div className="spread">
-              <span className="faint">Credito</span>
-              <span className="mono">
-                {keyState.credits
-                  ? formatCost(Math.max(0, keyState.credits.total - keyState.credits.used))
-                  : keyState.limitRemaining != null
-                    ? formatCost(keyState.limitRemaining)
-                    : '—'}
-              </span>
+              <span className="faint">Credit</span>
+              <span className="mono">{formatMoney(balance)}</span>
             </div>
             <div className="spread">
-              <span className="faint">Speso qui</span>
-              <span className="mono">{formatCost(settings?.spendTotal ?? 0)}</span>
+              <span className="faint">Spent here</span>
+              <span className="mono">{formatMoney(settings?.spendTotal ?? 0)}</span>
             </div>
           </div>
         </div>
