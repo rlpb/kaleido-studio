@@ -83,15 +83,31 @@ const NETWORK_HINTS: Record<string, string> = {
   UND_ERR_SOCKET: 'The socket closed unexpectedly, often a proxy or VPN cutting the connection.',
 };
 
-function networkError(err: unknown, timeoutMs: number): NetworkError {
+function networkError(err: unknown, timeoutMs: number, elapsedMs: number): NetworkError {
+  // How long the connection survived separates a request that was refused up
+  // front from one that was cut while the model was still working.
+  const elapsed = elapsedMs < 1000 ? `${elapsedMs}ms` : `${(elapsedMs / 1000).toFixed(1)}s`;
   if (err instanceof Error && err.name === 'TimeoutError') {
     const seconds = Math.round(timeoutMs / 1000);
     return new NetworkError(`The request timed out after ${seconds}s without a response.`, 'TimeoutError');
   }
   const detail = describeCause(err) || 'unknown cause';
   const hint = Object.keys(NETWORK_HINTS).find((code) => detail.includes(code));
-  const explanation = hint ? NETWORK_HINTS[hint] : 'The request never reached OpenRouter.';
-  return new NetworkError(`${explanation} (${detail})`, detail);
+  let explanation = hint ? NETWORK_HINTS[hint] : 'The request never reached OpenRouter.';
+
+  // A connection that dies right around the minute mark, while the model is
+  // still working and nothing is flowing over the socket, is an idle timeout on
+  // the path rather than anything either end did. VPN exit nodes and NAT
+  // gateways are the usual owners of that 60-second rule, and the symptom is
+  // specific enough to name instead of leaving as a raw error code.
+  if (elapsedMs >= 50_000 && elapsedMs <= 75_000) {
+    explanation =
+      'The connection was cut after about a minute of silence, while the model was still working. ' +
+      'That is an idle timeout on the network path, not a problem with the request: a VPN, a NAT ' +
+      'gateway or a corporate proxy dropping sessions that send nothing for 60 seconds. Disconnect ' +
+      'the VPN, or pick a model that answers faster than that.';
+  }
+  return new NetworkError(`${explanation} Died after ${elapsed}. (${detail})`, detail);
 }
 
 function headers(key: string | null, extra: Record<string, string> = {}): Record<string, string> {
@@ -102,10 +118,11 @@ function headers(key: string | null, extra: Record<string, string> = {}): Record
 
 /** Every request goes through here so no transport failure is reported bare. */
 async function send(url: string, init: RequestInit, timeoutMs: number): Promise<Response> {
+  const started = Date.now();
   try {
     return await fetchImpl(url, { ...init, signal: AbortSignal.timeout(timeoutMs) });
   } catch (err) {
-    throw networkError(err, timeoutMs);
+    throw networkError(err, timeoutMs, Date.now() - started);
   }
 }
 
