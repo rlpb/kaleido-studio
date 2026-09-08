@@ -1,15 +1,15 @@
 {
   "name": "kaleido-studio",
-  "version": "1.2.1",
+  "version": "1.3.0",
   "description": "Desktop studio for AI media generation on OpenRouter: images, image editing, video, speech and transcription in one app.",
   "private": true,
   "type": "module",
   "main": "dist-electron/main.cjs",
   "author": {
-    "name": "Kaleido Studio contributors",
+    "name": "rlpb",
     "email": "rlpb@users.noreply.github.com"
   },
-  "license": "MIT",
+  "license": "Apache-2.0",
   "scripts": {
     "dev": "concurrently -k -n vite,electron -c cyan,magenta \"vite\" \"npm:dev:electron\"",
     "dev:electron": "wait-on tcp:5173 && npm run build:electron && cross-env KALEIDO_DEV=1 electron .",

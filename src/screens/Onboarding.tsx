@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { bridge, type KeyState } from '../lib/api';
 import Icon from '../components/Icon';
+import { useT } from '../lib/i18n';
 
 interface Props {
   keyState: KeyState | null;
@@ -14,6 +15,7 @@ interface Props {
  * from the API.
  */
 export default function Onboarding({ keyState, onSaved, push }: Props) {
+  const t = useT();
   const [value, setValue] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(
@@ -28,11 +30,11 @@ export default function Onboarding({ keyState, onSaved, push }: Props) {
     try {
       const result = await bridge.key.set(key);
       if (!result.valid) {
-        setError(result.error ?? 'OpenRouter rejected this key.');
+        setError(result.error ?? t('onboarding.rejected'));
         return;
       }
       if (!result.encrypted) {
-        push('Key saved, but no system keychain is available, so it is stored in plain text.', 'info');
+        push(t('onboarding.plaintext'), 'info');
       }
       await onSaved();
     } catch (err) {
@@ -49,12 +51,12 @@ export default function Onboarding({ keyState, onSaved, push }: Props) {
           <div className="brand-mark lg" />
           <div>
             <h1>Kaleido Studio</h1>
-            <p className="faint">Images, video, speech and transcription on OpenRouter</p>
+            <p className="faint">{t('onboarding.tagline')}</p>
           </div>
         </div>
 
         <div className="field">
-          <label htmlFor="apikey">OpenRouter API key</label>
+          <label htmlFor="apikey">{t('onboarding.keyLabel')}</label>
           <div className="input-with-icon">
             <Icon name="key" />
             <input
@@ -72,8 +74,7 @@ export default function Onboarding({ keyState, onSaved, push }: Props) {
             />
           </div>
           <div className="help">
-            Verified immediately and stored encrypted with your operating system keychain. It stays on this computer and
-            is sent to nothing but openrouter.ai.
+            {t('onboarding.keyHelp')}
           </div>
         </div>
 
@@ -86,18 +87,18 @@ export default function Onboarding({ keyState, onSaved, push }: Props) {
 
         <button className="btn btn-primary btn-lg" onClick={() => void submit()} disabled={busy || !value.trim()}>
           {busy ? <span className="spin" /> : <Icon name="sparkle" />}
-          {busy ? 'Verifying' : 'Enter'}
+          {busy ? t('onboarding.verifying') : t('onboarding.enter')}
         </button>
 
         <ol className="steps">
           <li>
-            No key yet?{' '}
+            {t('onboarding.step1')}{' '}
             <span className="link" onClick={() => void bridge.app.openExternal('https://openrouter.ai/keys')}>
-              Create one at openrouter.ai/keys
+              {t('onboarding.step1link')}
             </span>
           </li>
-          <li>Paid models need credit on the account. Models tagged free work straight away.</li>
-          <li>From here on you only pick a screen and a model. Everything else is automatic.</li>
+          <li>{t('onboarding.step2')}</li>
+          <li>{t('onboarding.step3')}</li>
         </ol>
       </div>
     </div>

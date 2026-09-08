@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import type { ModelInfo } from '../lib/types';
 import { cheapness, priceSummary } from '../lib/pricing';
 import Icon from './Icon';
+import { useT } from '../lib/i18n';
 
 interface Props {
   models: ModelInfo[];
@@ -15,6 +16,7 @@ interface Props {
 type Sort = 'newest' | 'cheapest' | 'name';
 
 export default function ModelPicker({ models, selectedId, favorites, onSelect, onToggleFavorite, onClose }: Props) {
+  const t = useT();
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState<Sort>('newest');
   const [onlyFavorites, setOnlyFavorites] = useState(false);
@@ -43,12 +45,12 @@ export default function ModelPicker({ models, selectedId, favorites, onSelect, o
       <div className="modal" onMouseDown={(e) => e.stopPropagation()}>
         <div className="modal-head">
           <div className="spread">
-            <strong>Choose a model</strong>
+            <strong>{t('picker.title')}</strong>
             <div className="row">
               <span className="faint">
-                {visible.length} of {models.length}
+                {t('picker.count', { n: visible.length, m: models.length })}
               </span>
-              <button className="btn btn-ghost btn-icon" onClick={onClose} title="Close">
+              <button className="btn btn-ghost btn-icon" onClick={onClose} title={t('viewer.close')}>
                 <Icon name="close" />
               </button>
             </div>
@@ -58,20 +60,20 @@ export default function ModelPicker({ models, selectedId, favorites, onSelect, o
               <Icon name="search" />
               <input
                 type="search"
-                placeholder="Search by name, vendor or description…"
+                placeholder={t('picker.search')}
                 value={query}
                 autoFocus
                 onChange={(e) => setQuery(e.target.value)}
               />
             </div>
             <select value={sort} onChange={(e) => setSort(e.target.value as Sort)}>
-              <option value="newest">Newest first</option>
-              <option value="cheapest">Cheapest first</option>
-              <option value="name">Name</option>
+              <option value="newest">{t('picker.sortNewest')}</option>
+              <option value="cheapest">{t('picker.sortCheapest')}</option>
+              <option value="name">{t('picker.sortName')}</option>
             </select>
             <label className="switch">
               <input type="checkbox" checked={onlyFavorites} onChange={(e) => setOnlyFavorites(e.target.checked)} />
-              <span className="muted">Favourites only</span>
+              <span className="muted">{t('picker.favouritesOnly')}</span>
             </label>
           </div>
         </div>
@@ -80,7 +82,7 @@ export default function ModelPicker({ models, selectedId, favorites, onSelect, o
           {visible.length === 0 && (
             <div className="empty">
               <Icon name="search" size={28} />
-              <div>No model matches that search</div>
+              <div>{t('picker.noMatch')}</div>
             </div>
           )}
           {visible.map((model) => (
@@ -95,15 +97,15 @@ export default function ModelPicker({ models, selectedId, favorites, onSelect, o
                 <div className="row wrap">
                   <strong>{model.name}</strong>
                   <span className="chip">{model.vendor}</span>
-                  {model.price.free && <span className="chip chip-ok">free</span>}
+                  {model.price.free && <span className="chip chip-ok">{t('picker.free')}</span>}
                 </div>
                 <div className="mono faint model-id">{model.id}</div>
                 {model.description && <div className="desc">{model.description}</div>}
               </button>
-              <span className="chip mono nowrap">{priceSummary(model)}</span>
+              <span className="chip mono nowrap">{priceSummary(model, t)}</span>
               <button
                 className={`btn btn-ghost btn-icon${favorites.includes(model.id) ? ' is-favourite' : ''}`}
-                title={favorites.includes(model.id) ? 'Remove from favourites' : 'Add to favourites'}
+                title={favorites.includes(model.id) ? t('picker.removeFavourite') : t('picker.addFavourite')}
                 onClick={() => onToggleFavorite(model.id)}
               >
                 <Icon name="star" filled={favorites.includes(model.id)} />

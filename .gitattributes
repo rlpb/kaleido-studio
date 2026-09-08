@@ -1,0 +1,16 @@
+# Normalise everything to LF in the repository. Mixed endings turn every diff
+# into a whole-file rewrite and hide the real change.
+* text=auto eol=lf
+
+*.cmd text eol=crlf
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.ico binary
+*.icns binary
+*.mp4 binary
+*.mp3 binary

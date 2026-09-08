@@ -24,7 +24,7 @@ interface StoredConfig {
 
 const DEFAULTS: StoredConfig = {
   theme: 'dark',
-  language: 'it',
+  language: '',
   favoriteModels: [],
   lastMode: 'image',
   lastModelByMode: {},
@@ -43,6 +43,15 @@ function configPath(): string {
 
 export function defaultLibraryPath(): string {
   return path.join(app.getPath('userData'), 'Library');
+}
+
+/** First run follows the operating system, rather than assuming English. */
+function systemLanguage(): string {
+  try {
+    return app.getLocale() || 'en';
+  } catch {
+    return 'en';
+  }
 }
 
 function load(): StoredConfig {
@@ -122,7 +131,7 @@ export function getSettings(): Settings {
   return {
     hasKey: Boolean(cfg.key),
     theme: cfg.theme,
-    language: cfg.language,
+    language: cfg.language || systemLanguage(),
     libraryPath: cfg.libraryPath ?? defaultLibraryPath(),
     favoriteModels: cfg.favoriteModels,
     lastMode: cfg.lastMode,

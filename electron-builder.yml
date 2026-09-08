@@ -1,6 +1,6 @@
 appId: dev.kaleido.studio
 productName: Kaleido Studio
-copyright: Copyright © 2026 Kaleido Studio contributors
+copyright: Copyright 2026 rlpb
 
 directories:
   output: release
@@ -40,7 +40,7 @@ mac:
 
 linux:
   category: Graphics
-  maintainer: Kaleido Studio contributors <rlpb@users.noreply.github.com>
+  maintainer: rlpb <rlpb@users.noreply.github.com>
   synopsis: AI media generation through OpenRouter
   syncDesktopName: true
   target:

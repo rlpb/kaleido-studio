@@ -6,12 +6,14 @@ import { formatBytes, formatCost } from '../lib/pricing';
 import { MediaCard } from '../components/MediaCard';
 import MediaViewer from '../components/MediaViewer';
 import Icon from '../components/Icon';
+import { useT } from '../lib/i18n';
 
 type Push = (text: string, tone?: 'info' | 'ok' | 'error') => void;
 
 const PAGE = 60;
 
 export default function LibraryScreen({ push }: { push: Push }) {
+  const t = useT();
   const [items, setItems] = useState<LibraryItem[]>([]);
   const [total, setTotal] = useState(0);
   const [search, setSearch] = useState('');
@@ -43,23 +45,24 @@ export default function LibraryScreen({ push }: { push: Push }) {
   return (
     <>
       <div className="topbar">
-        <h1>Library</h1>
+        <h1>{t('library.title')}</h1>
         <span className="faint">
-          {total} item{total === 1 ? '' : 's'}
-          {stats && total !== stats.count ? ` of ${stats.count}` : ''}
+          {stats && total !== stats.count
+            ? t('library.itemsOf', { n: total, total: stats.count })
+            : t('library.items', { n: total })}
         </span>
         <div className="spacer" />
         <button
           className="btn btn-ghost btn-sm"
-          title="Drops index entries whose file was deleted outside the app"
+          title={t('library.cleanIndexTitle')}
           onClick={async () => {
             const removed = await bridge.library.prune();
-            push(removed ? `${removed} orphaned entries removed` : 'No orphaned entries', 'ok');
+            push(removed ? t('library.orphansRemoved', { n: removed }) : t('library.noOrphans'), 'ok');
             void load();
           }}
         >
           <Icon name="refresh" />
-          Clean index
+          {t('library.cleanIndex')}
         </button>
       </div>
 
@@ -68,21 +71,21 @@ export default function LibraryScreen({ push }: { push: Push }) {
           <div className="stat-grid">
             <div className="stat">
               <div className="value mono">{stats.count}</div>
-              <div className="label">Files</div>
+              <div className="label">{t('library.files')}</div>
             </div>
             <div className="stat">
               <div className="value mono">{formatCost(stats.totalCost)}</div>
-              <div className="label">Cumulative cost</div>
+              <div className="label">{t('library.cumulativeCost')}</div>
             </div>
             <div className="stat">
               <div className="value mono">{formatBytes(stats.bytes)}</div>
-              <div className="label">Disk usage</div>
+              <div className="label">{t('library.diskUsage')}</div>
             </div>
             <div className="stat">
               <div className="value mono">
                 {stats.byKind.image ?? 0}/{stats.byKind.video ?? 0}/{stats.byKind.audio ?? 0}
               </div>
-              <div className="label">Images / video / audio</div>
+              <div className="label">{t('library.byKind')}</div>
             </div>
           </div>
         )}
@@ -92,36 +95,36 @@ export default function LibraryScreen({ push }: { push: Push }) {
             <Icon name="search" />
             <input
               type="search"
-              placeholder="Search prompts, models, transcripts…"
+              placeholder={t('library.search')}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
           <select value={mode} onChange={(e) => setMode(e.target.value as ModeId | 'all')}>
-            <option value="all">All modes</option>
+            <option value="all">{t('library.allModes')}</option>
             {MODES.map((m) => (
               <option key={m.id} value={m.id}>
-                {m.label}
+                {t(`mode.${m.id}.label`)}
               </option>
             ))}
           </select>
           <select value={kind} onChange={(e) => setKind(e.target.value as MediaKind | 'all')}>
-            <option value="all">All types</option>
-            <option value="image">Images</option>
-            <option value="video">Video</option>
-            <option value="audio">Audio</option>
-            <option value="text">Text</option>
+            <option value="all">{t('library.allTypes')}</option>
+            <option value="image">{t('library.images')}</option>
+            <option value="video">{t('library.video')}</option>
+            <option value="audio">{t('library.audio')}</option>
+            <option value="text">{t('library.text')}</option>
           </select>
           <label className="switch">
             <input type="checkbox" checked={favoritesOnly} onChange={(e) => setFavoritesOnly(e.target.checked)} />
-            <span className="muted">Favourites only</span>
+            <span className="muted">{t('library.favouritesOnly')}</span>
           </label>
         </div>
 
         {items.length === 0 ? (
           <div className="empty">
             <Icon name="library" size={30} />
-            <div>Nothing here yet</div>
+            <div>{t('library.empty')}</div>
           </div>
         ) : (
           <>
@@ -138,11 +141,11 @@ export default function LibraryScreen({ push }: { push: Push }) {
                   }}
                   onUsePrompt={(prompt) => {
                     void navigator.clipboard.writeText(prompt);
-                    push('Prompt copied to the clipboard', 'ok');
+                    push(t('card.promptCopied'), 'ok');
                   }}
                   onDelete={async (ref) => {
                     await bridge.library.remove(ref.id);
-                    push('Item deleted', 'ok');
+                    push(t('card.deleted'), 'ok');
                     void load();
                   }}
                 />
@@ -150,7 +153,7 @@ export default function LibraryScreen({ push }: { push: Push }) {
             </div>
             {items.length < total && (
               <button className="btn self-center" onClick={() => setLimit((l) => l + PAGE)}>
-                Load {Math.min(PAGE, total - items.length)} more
+                {t('library.loadMore', { n: Math.min(PAGE, total - items.length) })}
               </button>
             )}
           </>

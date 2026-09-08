@@ -88,6 +88,7 @@ const es: Dict = {
   'basis.free': 'gratis',
   'basis.unknown': 'desconocido',
   'cost.noModel': 'Ningún modelo seleccionado',
+  'cost.listPrice': '{rate}/s × {duration}s × {runs}',
   'cost.measured': 'Lo que costó realmente la última ejecución idéntica',
   'cost.measuredBatch': 'Lo que costó realmente la última ejecución idéntica, × {n}',
   'cost.noListPrice': 'Modelo sin tarifa de lista',

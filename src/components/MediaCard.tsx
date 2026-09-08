@@ -2,6 +2,7 @@ import { bridge } from '../lib/api';
 import type { MediaKind } from '../lib/types';
 import { formatCost } from '../lib/pricing';
 import Icon from './Icon';
+import { useT } from '../lib/i18n';
 
 export interface MediaRef {
   id: string;
@@ -31,6 +32,7 @@ interface CardProps {
 const timeOf = (ms: number) => new Date(ms).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
 
 export function MediaCard({ item, onOpen, onReuse, onUsePrompt, onToggleFavorite, onDelete, push }: CardProps) {
+  const t = useT();
   const url = bridge.mediaUrl(item.path);
 
   return (
@@ -59,13 +61,13 @@ export function MediaCard({ item, onOpen, onReuse, onUsePrompt, onToggleFavorite
           </div>
         )}
         {item.kind === 'text' && (
-          <div className="text-preview">{(item.text ?? '').slice(0, 420) || 'Empty transcription'}</div>
+          <div className="text-preview">{(item.text ?? '').slice(0, 420) || t('card.emptyTranscription')}</div>
         )}
       </div>
 
       <div className="media-meta">
         <div className="prompt" title={item.prompt}>
-          {item.prompt || <span className="faint">no prompt</span>}
+          {item.prompt || <span className="faint">{t('card.noPrompt')}</span>}
         </div>
         <div className="spread faint tiny">
           <span className="ellipsis">{item.modelName}</span>
@@ -77,7 +79,7 @@ export function MediaCard({ item, onOpen, onReuse, onUsePrompt, onToggleFavorite
           {onToggleFavorite && (
             <button
               className={`btn btn-ghost btn-icon${item.favorite ? ' is-favourite' : ''}`}
-              title="Favourite"
+              title={t('card.favourite')}
               onClick={() => onToggleFavorite(item)}
             >
               <Icon name="star" filled={item.favorite} />
@@ -85,38 +87,38 @@ export function MediaCard({ item, onOpen, onReuse, onUsePrompt, onToggleFavorite
           )}
           <button
             className="btn btn-ghost btn-icon"
-            title="Save a copy elsewhere"
+            title={t('card.saveCopy')}
             onClick={async () => {
               const saved = await bridge.library.exportCopy(item.path);
-              if (saved) push('Copy saved', 'ok');
+              if (saved) push(t('card.copySaved'), 'ok');
             }}
           >
             <Icon name="download" />
           </button>
           <button
             className="btn btn-ghost btn-icon"
-            title="Show in folder"
+            title={t('card.showInFolder')}
             onClick={() => void bridge.library.reveal(item.path)}
           >
             <Icon name="folder" />
           </button>
           {onReuse && (item.kind === 'image' || item.kind === 'video') && (
-            <button className="btn btn-ghost btn-icon" title="Use as input" onClick={() => onReuse(item)}>
+            <button className="btn btn-ghost btn-icon" title={t('card.useAsInput')} onClick={() => onReuse(item)}>
               <Icon name="reuse" />
             </button>
           )}
           {onUsePrompt && item.prompt && (
-            <button className="btn btn-ghost btn-icon" title="Reuse the prompt" onClick={() => onUsePrompt(item.prompt)}>
+            <button className="btn btn-ghost btn-icon" title={t('card.reusePrompt')} onClick={() => onUsePrompt(item.prompt)}>
               <Icon name="copy" />
             </button>
           )}
           {item.kind === 'text' && (
             <button
               className="btn btn-ghost btn-icon"
-              title="Copy the text"
+              title={t('card.copyText')}
               onClick={() => {
                 void navigator.clipboard.writeText(item.text ?? '');
-                push('Text copied', 'ok');
+                push(t('card.textCopied'), 'ok');
               }}
             >
               <Icon name="copy" />
@@ -124,7 +126,7 @@ export function MediaCard({ item, onOpen, onReuse, onUsePrompt, onToggleFavorite
           )}
           <div className="spacer" />
           {onDelete && (
-            <button className="btn btn-ghost btn-icon danger" title="Delete" onClick={() => onDelete(item)}>
+            <button className="btn btn-ghost btn-icon danger" title={t('card.delete')} onClick={() => onDelete(item)}>
               <Icon name="trash" />
             </button>
           )}
