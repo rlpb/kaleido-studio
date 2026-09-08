@@ -6,6 +6,21 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.3.3] - 2026-09-08
+
+### Fixed
+
+- **Dialogs no longer left an opaque rectangle over their own blur.** The caption
+  buttons are painted by the system on top of everything, including a scrim, so
+  a full-screen overlay produced a bright block floating in the corner. Overlays
+  now begin below the title bar, which stays a bar instead of becoming a cut-out.
+
+### Changed
+
+- README screenshots retaken with the integrated title bar, and a shot of the
+  model picker added: it shows the catalog read live from OpenRouter with each
+  model price, which is the claim the rest of the page makes in prose.
+
 ## [1.3.2] - 2026-09-08
 
 ### Changed
@@ -171,7 +186,8 @@ First release.
   cost and disk usage.
 - Installers for Windows, macOS and Linux, built by CI.
 
-[Unreleased]: https://github.com/rlpb/kaleido-studio/compare/v1.3.2...HEAD
+[Unreleased]: https://github.com/rlpb/kaleido-studio/compare/v1.3.3...HEAD
+[1.3.3]: https://github.com/rlpb/kaleido-studio/compare/v1.3.2...v1.3.3
 [1.3.2]: https://github.com/rlpb/kaleido-studio/compare/v1.3.1...v1.3.2
 [1.3.1]: https://github.com/rlpb/kaleido-studio/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/rlpb/kaleido-studio/compare/v1.2.1...v1.3.0

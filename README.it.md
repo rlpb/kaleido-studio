@@ -87,6 +87,10 @@ ottiene il suo form corretto senza che venga toccata una riga di codice. Quando
 un provider aggiunge una manopola, la sua etichetta ripiega su quella fornita
 dall'API invece di sparire.
 
+<div align="center">
+<img src="docs/screenshot-models.png" alt="Il selettore dei modelli, con il catalogo letto da OpenRouter e il prezzo aggiornato di ciascuno" width="900">
+</div>
+
 ## Come avviene una generazione
 
 1. Scegli una modalità, che fissa l'endpoint e il tipo di input richiesto.

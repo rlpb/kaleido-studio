@@ -84,6 +84,10 @@ the control panel from it. A new model with parameters nobody has seen before
 gets a correct form without a line of code being touched. When a provider adds a
 knob, its label falls back to the one the API supplied rather than disappearing.
 
+<div align="center">
+<img src="docs/screenshot-models.png" alt="The model picker, listing the catalog read from OpenRouter with each model's live price" width="900">
+</div>
+
 ## How a generation works
 
 1. You pick a mode, which pins an endpoint and the kind of input it needs.
