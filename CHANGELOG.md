@@ -14,8 +14,8 @@ found by looking rather than by a failing check.
 ### Fixed
 
 - **Rates lost their magnitude.** Trimming trailing zeros ate the integer part
-  too, so a transcription model billed at 00000 per million tokens displayed
-  as , and 0 as . Every price in the catalog that day happened to end in
+  too, so a transcription model billed at $100000 per million tokens displayed
+  as $1, and $50 as $5. Every price in the catalog that day happened to end in
   a digit other than zero, which is why it stayed hidden.
 - **A zero cost printed the English word** under a translated label, because
   the formatter hard-coded it. It takes the translator now.
@@ -26,6 +26,16 @@ found by looking rather than by a failing check.
   duplicate help is gone.
 - Italian typos where apostrophes had been dropped.
 
+
+### Changed
+
+- **Node 22 is the floor now.** Electron 44 and concurrently 10 both declare
+  it, so the workflows, the engines field and the docs moved together rather
+  than leaving a version nobody actually supports written in three places.
+- Electron 41 to 44, concurrently 9 to 10, and the GitHub actions to their
+  current majors, which also ends the Node 20 deprecation warning on every run.
+- `download-artifact` was still on v4 while `upload-artifact` had moved to v7.
+  The two majors have to match or the publish job finds nothing to attach.
 ### Removed
 
 - A library reader nothing read, an IPC handler the preload never exposed, and
@@ -35,7 +45,7 @@ found by looking rather than by a failing check.
 
 ### Added
 
-- ,  and  in package.json.
+- `engines`, `homepage` and `bugs` in package.json.
 - Checks for the two pricing defects above, each verified by reintroducing the
   bug and watching the check fail.
 

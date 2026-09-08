@@ -10,7 +10,7 @@ Immagini, video, voce e trascrizioni su OpenRouter, con i controlli generati dal
 [![CI](https://github.com/rlpb/kaleido-studio/actions/workflows/ci.yml/badge.svg)](https://github.com/rlpb/kaleido-studio/actions/workflows/ci.yml)
 [![Ultima release](https://img.shields.io/github/v/release/rlpb/kaleido-studio?display_name=tag&sort=semver)](https://github.com/rlpb/kaleido-studio/releases/latest)
 [![Licenza: Apache 2.0](https://img.shields.io/badge/licenza-Apache%202.0-black.svg)](LICENSE)
-[![Node 20+](https://img.shields.io/badge/node-20%2B-blue.svg)](package.json)
+[![Node 22+](https://img.shields.io/badge/node-22%2B-blue.svg)](package.json)
 [![Piattaforme](https://img.shields.io/badge/piattaforme-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)](#download)
 
 [Download](#download) · [Come funziona](#come-avviene-una-generazione) · [Costi](#costi) · [Sicurezza](#sicurezza-della-chiave) · [FAQ](#faq) · [English](README.md)
@@ -174,7 +174,7 @@ npm install
 npm start
 ```
 
-Node.js 20 o superiore.
+Node.js 22 o superiore. Lo richiedono Electron e gli strumenti di build.
 
 ## Cosa Kaleido non è
 
