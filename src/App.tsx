@@ -90,13 +90,19 @@ export default function App() {
   // --- jobs ---------------------------------------------------------------
   useEffect(() => {
     void bridge.jobs.list().then(setJobs);
-    return bridge.jobs.onUpdate((job) => {
+    // Removals arrive as a whole list, since a per-job event cannot say "gone".
+    const stopList = bridge.jobs.onList(setJobs);
+    const stopUpdate = bridge.jobs.onUpdate((job) => {
       setJobs((current) => {
         const next = current.filter((j) => j.id !== job.id);
         return [job, ...next].sort((a, b) => b.createdAt - a.createdAt);
       });
       if (job.status === 'error') push(`${job.modelName}: ${job.error ?? 'failed'}`, 'error');
     });
+    return () => {
+      stopList();
+      stopUpdate();
+    };
   }, [push]);
 
   // Refresh the balance whenever spending actually happened.

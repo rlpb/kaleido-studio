@@ -49,6 +49,7 @@ interface Bridge {
     cancel(id: string): Promise<boolean>;
     retry(id: string): Promise<Job | null>;
     clear(): Promise<Job[]>;
+    onList(handler: (jobs: Job[]) => void): () => void;
     onUpdate(handler: (job: Job) => void): () => void;
   };
   library: {
