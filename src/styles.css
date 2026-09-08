@@ -767,7 +767,10 @@ select {
 
 .overlay {
   position: fixed;
-  inset: 0;
+  /* Starts below the title bar. The caption buttons are painted by the system
+     on top of everything, so a scrim that covered them left an opaque rectangle
+     floating over the blur. */
+  inset: 50px 0 0 0;
   background: rgb(0 0 0 / 58%);
   backdrop-filter: blur(4px);
   display: flex;
@@ -1154,7 +1157,7 @@ select {
 
 .viewer {
   position: fixed;
-  inset: 0;
+  inset: 50px 0 0 0;
   /* Near-opaque: at 90% the app behind stayed legible and competed with the
      image the viewer exists to show. */
   background: rgb(6 7 10 / 97%);
