@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { bridge, type AppInfo, type KeyState } from '../lib/api';
 import type { Settings } from '../lib/types';
 import { formatMoney } from '../lib/pricing';
+import { LANGUAGES, useT } from '../lib/i18n';
 import Icon from '../components/Icon';
 
 type Push = (text: string, tone?: 'info' | 'ok' | 'error') => void;
@@ -15,6 +16,7 @@ interface Props {
 }
 
 export default function SettingsScreen({ settings, keyState, setSettings, onKeyChanged, push }: Props) {
+  const t = useT();
   const [info, setInfo] = useState<AppInfo | null>(null);
   const [newKey, setNewKey] = useState('');
   const [busy, setBusy] = useState(false);
@@ -29,63 +31,61 @@ export default function SettingsScreen({ settings, keyState, setSettings, onKeyC
     try {
       const result = await bridge.key.set(newKey.trim());
       if (!result.valid) {
-        push(result.error ?? 'Key rejected', 'error');
+        push(result.error ?? t('settings.keyRejected'), 'error');
         return;
       }
       setNewKey('');
       await onKeyChanged();
-      push('Key updated', 'ok');
+      push(t('settings.keyUpdated'), 'ok');
     } finally {
       setBusy(false);
     }
   };
 
   const balance = keyState.credits ? Math.max(0, keyState.credits.total - keyState.credits.used) : null;
+  const currentLang = LANGUAGES.find((l) => l.code === settings.language)?.code ?? 'en';
 
   return (
     <>
       <div className="topbar">
-        <h1>Settings</h1>
+        <h1>{t('settings.title')}</h1>
       </div>
 
       <div className="settings">
         <section className="card">
-          <div className="section-title">OpenRouter account</div>
+          <div className="section-title">{t('settings.account')}</div>
           <div className="stat-grid">
             <div className="stat">
               <div className="value mono">{formatMoney(balance)}</div>
-              <div className="label">Credit remaining</div>
+              <div className="label">{t('settings.creditRemaining')}</div>
             </div>
             <div className="stat">
               <div className="value mono">{formatMoney(keyState.usage ?? 0)}</div>
-              <div className="label">Usage on this key</div>
+              <div className="label">{t('settings.usageOnKey')}</div>
             </div>
             <div className="stat">
               <div className="value mono">{formatMoney(settings.spendTotal)}</div>
-              <div className="label">Spent from Kaleido</div>
+              <div className="label">{t('settings.spentFromApp')}</div>
             </div>
           </div>
 
           <div className="row wrap gap-top">
             <span className={`chip ${keyState.valid ? 'chip-ok' : 'chip-danger'}`}>
-              {keyState.valid ? 'key valid' : 'key invalid'}
+              {keyState.valid ? t('settings.keyValid') : t('settings.keyInvalid')}
             </span>
             <span className={`chip ${keyState.encrypted ? 'chip-ok' : 'chip-warn'}`}>
-              {keyState.encrypted ? 'encrypted by the OS' : 'stored in plain text'}
+              {keyState.encrypted ? t('settings.encrypted') : t('settings.plaintext')}
             </span>
             {keyState.label && <span className="chip mono">{keyState.label}</span>}
-            {keyState.isFreeTier && <span className="chip chip-warn">free tier account</span>}
+            {keyState.isFreeTier && <span className="chip chip-warn">{t('settings.freeTier')}</span>}
           </div>
 
           {!keyState.encrypted && (
-            <div className="help gap-top">
-              No operating system keychain is available on this machine, so the key sits in plain text in the
-              configuration file under {info?.userData ?? 'the app data folder'}.
-            </div>
+            <div className="help gap-top">{t('settings.noKeychain', { path: info?.userData ?? '' })}</div>
           )}
 
           <div className="field gap-top">
-            <label htmlFor="newkey">Replace the key</label>
+            <label htmlFor="newkey">{t('settings.replaceKey')}</label>
             <div className="row">
               <div className="input-with-icon grow">
                 <Icon name="key" />
@@ -99,7 +99,7 @@ export default function SettingsScreen({ settings, keyState, setSettings, onKeyC
                 />
               </div>
               <button className="btn" onClick={() => void replaceKey()} disabled={busy || !newKey.trim()}>
-                Save
+                {t('settings.save')}
               </button>
             </div>
           </div>
@@ -113,25 +113,42 @@ export default function SettingsScreen({ settings, keyState, setSettings, onKeyC
               }}
             >
               <Icon name="trash" />
-              Remove the key from this computer
+              {t('settings.removeKey')}
             </button>
             <div className="spacer" />
             <button
               className="btn btn-ghost btn-sm"
               onClick={async () => {
                 setSettings(await bridge.settings.resetSpend());
-                push('Counter reset', 'ok');
+                push(t('settings.counterReset'), 'ok');
               }}
             >
-              Reset the spend counter
+              {t('settings.resetSpend')}
             </button>
           </div>
         </section>
 
         <section className="card">
-          <div className="section-title">Appearance and behaviour</div>
+          <div className="section-title">{t('settings.appearance')}</div>
+
           <div className="field">
-            <label htmlFor="theme">Theme</label>
+            <label htmlFor="language">{t('settings.language')}</label>
+            <select
+              id="language"
+              value={currentLang}
+              onChange={async (e) => setSettings(await bridge.settings.update({ language: e.target.value }))}
+            >
+              {LANGUAGES.map((l) => (
+                <option key={l.code} value={l.code}>
+                  {l.label}
+                </option>
+              ))}
+            </select>
+            <div className="help">{t('settings.languageHelp')}</div>
+          </div>
+
+          <div className="field gap-top">
+            <label htmlFor="theme">{t('settings.theme')}</label>
             <select
               id="theme"
               value={settings.theme}
@@ -139,14 +156,14 @@ export default function SettingsScreen({ settings, keyState, setSettings, onKeyC
                 setSettings(await bridge.settings.update({ theme: e.target.value as Settings['theme'] }))
               }
             >
-              <option value="dark">Dark</option>
-              <option value="light">Light</option>
-              <option value="system">Match the system</option>
+              <option value="dark">{t('settings.themeDark')}</option>
+              <option value="light">{t('settings.themeLight')}</option>
+              <option value="system">{t('settings.themeSystem')}</option>
             </select>
           </div>
 
           <div className="field gap-top">
-            <label htmlFor="concurrency">Parallel generations</label>
+            <label htmlFor="concurrency">{t('settings.concurrency')}</label>
             <input
               id="concurrency"
               type="number"
@@ -155,38 +172,36 @@ export default function SettingsScreen({ settings, keyState, setSettings, onKeyC
               value={settings.concurrency}
               onChange={async (e) => setSettings(await bridge.settings.update({ concurrency: Number(e.target.value) }))}
             />
-            <div className="help">How many requests start at once. Raising it shortens queues and spends faster.</div>
+            <div className="help">{t('settings.concurrencyHelp')}</div>
           </div>
         </section>
 
         <section className="card">
-          <div className="section-title">Library</div>
+          <div className="section-title">{t('settings.library')}</div>
           <div className="field">
-            <label>Folder for generated files</label>
+            <label>{t('settings.libraryFolder')}</label>
             <div className="row">
               <input readOnly className="mono" value={settings.libraryPath} />
               <button className="btn" onClick={async () => setSettings(await bridge.settings.pickLibrary())}>
                 <Icon name="folder" />
-                Change
+                {t('settings.change')}
               </button>
             </div>
-            <div className="help">
-              Files already saved stay where they are. Moving the folder only changes where the next ones land.
-            </div>
+            <div className="help">{t('settings.libraryHelp')}</div>
           </div>
           <button
             className="btn btn-ghost btn-sm gap-top"
             onClick={async () => {
               await bridge.prompts.clear();
-              push('Prompt history cleared', 'ok');
+              push(t('settings.promptsCleared'), 'ok');
             }}
           >
-            Clear the prompt history
+            {t('settings.clearPrompts')}
           </button>
         </section>
 
         <section className="card">
-          <div className="section-title">About</div>
+          <div className="section-title">{t('settings.about')}</div>
           <div className="mono faint about">
             <div>Kaleido Studio {info?.version}</div>
             <div>
@@ -200,11 +215,11 @@ export default function SettingsScreen({ settings, keyState, setSettings, onKeyC
               onClick={() => void bridge.app.openExternal('https://github.com/rlpb/kaleido-studio')}
             >
               <Icon name="external" />
-              Repository
+              {t('settings.repository')}
             </button>
             <button className="btn btn-sm" onClick={() => void bridge.app.openExternal('https://openrouter.ai/docs')}>
               <Icon name="external" />
-              OpenRouter docs
+              {t('settings.docs')}
             </button>
           </div>
         </section>

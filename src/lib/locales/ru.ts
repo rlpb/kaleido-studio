@@ -88,6 +88,7 @@ const ru: Dict = {
   'basis.free': 'бесплатно',
   'basis.unknown': 'неизвестно',
   'cost.noModel': 'Модель не выбрана',
+  'cost.listPrice': '{rate}/s × {duration}s × {runs}',
   'cost.measured': 'Сколько на самом деле стоил прошлый такой же запуск',
   'cost.measuredBatch': 'Сколько на самом деле стоил прошлый такой же запуск, × {n}',
   'cost.noListPrice': 'У модели нет цены в прайсе',

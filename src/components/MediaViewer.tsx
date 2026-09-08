@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { bridge } from '../lib/api';
 import { formatCost } from '../lib/pricing';
 import Icon from './Icon';
+import { useT } from '../lib/i18n';
 import type { MediaRef } from './MediaCard';
 
 type Push = (text: string, tone?: 'info' | 'ok' | 'error') => void;
@@ -32,6 +33,7 @@ const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v
  * the whole surface stays clickable.
  */
 export default function MediaViewer({ items, index, onIndex, onClose, push }: Props) {
+  const t = useT();
   const item = items[index];
   const count = items.length;
 
@@ -151,18 +153,18 @@ export default function MediaViewer({ items, index, onIndex, onClose, push }: Pr
           className="btn btn-sm"
           onClick={async () => {
             const saved = await bridge.library.exportCopy(item.path);
-            if (saved) push('Copy saved', 'ok');
+            if (saved) push(t('card.copySaved'), 'ok');
           }}
         >
           <Icon name="download" />
-          Save a copy
+          {t('viewer.saveCopy')}
         </button>
         <button className="btn btn-sm" onClick={() => void bridge.library.open(item.path)}>
           <Icon name="external" />
-          Open externally
+          {t('viewer.openExternally')}
         </button>
         <button className="btn btn-sm" onClick={onClose}>
-          Close <span className="kbd">Esc</span>
+          {t('viewer.close')} <span className="kbd">Esc</span>
         </button>
       </div>
 
@@ -176,7 +178,7 @@ export default function MediaViewer({ items, index, onIndex, onClose, push }: Pr
         {count > 1 && (
           <button
             className="viewer-nav prev"
-            title="Previous (left arrow)"
+            title={t('viewer.previous')}
             onPointerDown={(e) => e.stopPropagation()}
             onClick={() => step(-1)}
           >
@@ -202,7 +204,7 @@ export default function MediaViewer({ items, index, onIndex, onClose, push }: Pr
         {count > 1 && (
           <button
             className="viewer-nav next"
-            title="Next (right arrow)"
+            title={t('viewer.next')}
             onPointerDown={(e) => e.stopPropagation()}
             onClick={() => step(1)}
           >
@@ -219,17 +221,18 @@ export default function MediaViewer({ items, index, onIndex, onClose, push }: Pr
             className="btn btn-ghost btn-sm"
             onClick={() => {
               void navigator.clipboard.writeText(item.prompt);
-              push('Prompt copied', 'ok');
+              push(t('card.promptCopied'), 'ok');
             }}
           >
             <Icon name="copy" />
-            Copy prompt
+            {t('viewer.copyPrompt')}
           </button>
         )}
         <div className="spacer" />
         <span className="faint tiny">
-          {count > 1 ? 'Arrows move · ' : ''}
-          {zoomable ? 'wheel zooms · drag pans · ' : ''}click closes
+          {count > 1 ? `${t('viewer.hintArrows')} · ` : ''}
+          {zoomable ? `${t('viewer.hintZoom')} · ` : ''}
+          {t('viewer.hintClick')}
         </span>
       </div>
     </div>

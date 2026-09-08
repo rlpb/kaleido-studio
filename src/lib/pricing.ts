@@ -1,4 +1,7 @@
 import type { ModelInfo } from './types';
+import type { Dict } from './locales/en';
+
+type Translate = (key: keyof Dict, vars?: Record<string, string | number>) => string;
 
 type Params = Record<string, string | number | boolean>;
 
@@ -20,9 +23,12 @@ export type EstimateBasis = 'list price' | 'measured' | 'free' | 'unknown';
 export interface Estimate {
   /** USD for the whole batch, or null when no honest figure can be produced. */
   total: number | null;
-  /** Where the number comes from, so the UI never presents a guess as a quote. */
+  /** Where the number comes from, so the UI never presents a guess as a quote.
+   *  Kept as a stable identifier; the interface translates it for display. */
   basis: EstimateBasis;
-  detail: string;
+  /** The explanation as a key plus values, so it can be shown in any language. */
+  detailKey: keyof Dict;
+  detailVars?: Record<string, string | number>;
 }
 
 /** Trims a rate to the digits that carry meaning, without scientific notation. */
@@ -43,20 +49,19 @@ export function formatRate(perUnit: number, unit: string): string {
 }
 
 /** One line describing how a model bills, whatever scheme it uses. */
-export function priceSummary(model: ModelInfo): string {
+export function priceSummary(model: ModelInfo, t: Translate): string {
   const seconds = model.price.perVideoSecond;
   if (seconds && Object.keys(seconds).length) {
     const rates = Object.values(seconds);
     const min = Math.min(...rates);
     const max = Math.max(...rates);
     return min === max
-      ? `$${significant(min)} / video second`
-      : `$${significant(min)}–${significant(max)} / video second`;
+      ? t('picker.perVideoSecond', { rate: `${significant(min)}` })
+      : t('picker.perVideoSecondRange', { min: `${significant(min)}`, max: `${significant(max)}` });
   }
-  if (model.price.perImageToken) return formatRate(model.price.perImageToken, 'token');
-  if (model.price.perAudioOutputToken) return formatRate(model.price.perAudioOutputToken, 'token');
-  if (model.price.perInputToken) return formatRate(model.price.perInputToken, 'token');
-  return 'free';
+  const perToken = model.price.perImageToken ?? model.price.perAudioOutputToken ?? model.price.perInputToken;
+  if (perToken) return t('picker.perMillionTokens', { rate: `${significant(perToken * 1_000_000)}` });
+  return t('picker.free');
 }
 
 /** Lower is cheaper. Used to sort the model list by price. */
@@ -78,7 +83,7 @@ export function estimateCost(
   batch: number,
   observedCosts: Record<string, number>,
 ): Estimate {
-  if (!model) return { total: null, basis: 'unknown', detail: 'No model selected' };
+  if (!model) return { total: null, basis: 'unknown', detailKey: 'cost.noModel' };
 
   const runs = Math.max(1, batch);
   const perSecond = model.price.perVideoSecond;
@@ -91,7 +96,8 @@ export function estimateCost(
       return {
         total: rate * duration * runs,
         basis: 'list price',
-        detail: `$${significant(rate)}/s × ${duration}s${runs > 1 ? ` × ${runs}` : ''}`,
+        detailKey: 'cost.listPrice',
+        detailVars: { rate: `${significant(rate)}`, duration, runs },
       };
     }
   }
@@ -101,22 +107,24 @@ export function estimateCost(
     return {
       total: observed * runs,
       basis: 'measured',
-      detail: `What the last identical run actually cost${runs > 1 ? `, × ${runs}` : ''}`,
+      detailKey: runs > 1 ? 'cost.measuredBatch' : 'cost.measured',
+      detailVars: { n: runs },
     };
   }
 
   if (model.price.free) {
-    return { total: 0, basis: 'free', detail: 'No list price on this model' };
+    return { total: 0, basis: 'free', detailKey: 'cost.noListPrice' };
   }
 
   const rate = model.price.perImageToken ?? model.price.perAudioOutputToken ?? model.price.perOutputToken;
-  return {
-    total: null,
-    basis: 'unknown',
-    detail: rate
-      ? `Billed at ${formatRate(rate, 'token')}. The token count depends on the result, so the exact cost appears when the run finishes.`
-      : 'The exact cost appears when the run finishes.',
-  };
+  return rate
+    ? {
+        total: null,
+        basis: 'unknown',
+        detailKey: 'cost.rate',
+        detailVars: { rate: formatRate(rate, 'token') },
+      }
+    : { total: null, basis: 'unknown', detailKey: 'cost.unknown' };
 }
 
 export function formatCost(value: number | null | undefined): string {

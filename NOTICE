@@ -1,0 +1,10 @@
+Kaleido Studio
+Copyright 2026 rlpb
+
+This product includes software developed by rlpb
+(https://github.com/rlpb/kaleido-studio).
+
+Kaleido Studio is a client for OpenRouter (https://openrouter.ai), which is a
+separate service and is not distributed as part of this product. OpenRouter
+routes every request to the model providers, meters it and bills it; the models
+themselves belong to their respective vendors and carry their own terms.

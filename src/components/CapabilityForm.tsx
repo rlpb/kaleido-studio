@@ -1,5 +1,7 @@
 import type { ParamSpec } from '../lib/types';
 import Icon from './Icon';
+import { useT } from '../lib/i18n';
+import type { Dict } from '../lib/locales/en';
 
 type Value = string | number | boolean;
 
@@ -15,8 +17,19 @@ interface Props {
  * endpoints, so a model added tomorrow gets a correct form with no code change.
  */
 export default function CapabilityForm({ params, values, onChange }: Props) {
+  const t = useT();
+  // Falls back to the label the API supplied when a parameter has no dictionary
+  // entry, which is what happens the day a provider adds a knob nobody has seen.
+  const label = (key: string, fallback: string) => {
+    const translated = t(`param.${key}` as keyof Dict);
+    return translated === `param.${key}` ? fallback : translated;
+  };
+  const helpFor = (key: string, fallback?: string) => {
+    const translated = t(`help.${key}` as keyof Dict);
+    return translated === `help.${key}` ? fallback : translated;
+  };
   if (!params.length) {
-    return <div className="faint">This model exposes no parameters. The prompt and the inputs are all it takes.</div>;
+    return <div className="faint">{t('studio.noParameters')}</div>;
   }
 
   return (
@@ -30,16 +43,16 @@ export default function CapabilityForm({ params, values, onChange }: Props) {
             <div className="field" key={spec.key}>
               <label className="switch plain">
                 <input type="checkbox" checked={checked} onChange={(e) => onChange(spec.key, e.target.checked)} />
-                <span>{spec.label}</span>
+                <span>{label(spec.key, spec.label)}</span>
               </label>
-              {spec.help && <div className="help">{spec.help}</div>}
+              {helpFor(spec.key, spec.help) && <div className="help">{helpFor(spec.key, spec.help)}</div>}
             </div>
           );
         }
 
         return (
           <div className="field" key={spec.key}>
-            <label htmlFor={`p-${spec.key}`}>{spec.label}</label>
+            <label htmlFor={`p-${spec.key}`}>{label(spec.key, spec.label)}</label>
 
             {spec.kind === 'enum' && (
               <select
@@ -47,7 +60,7 @@ export default function CapabilityForm({ params, values, onChange }: Props) {
                 value={current === undefined ? (spec.default ?? '') : String(current)}
                 onChange={(e) => onChange(spec.key, e.target.value === '' ? undefined : e.target.value)}
               >
-                {spec.default === undefined && <option value="">Provider default</option>}
+                {spec.default === undefined && <option value="">{t('param.providerDefault')}</option>}
                 {spec.values.map((option) => (
                   <option key={option} value={option}>
                     {option}
@@ -71,7 +84,7 @@ export default function CapabilityForm({ params, values, onChange }: Props) {
                 {spec.key === 'seed' && (
                   <button
                     className="btn btn-icon"
-                    title="Roll a random seed"
+                    title={t('param.randomSeed')}
                     onClick={() => onChange(spec.key, Math.floor(Math.random() * 2147483647))}
                   >
                     <Icon name="dice" />
@@ -105,7 +118,7 @@ export default function CapabilityForm({ params, values, onChange }: Props) {
               />
             )}
 
-            {spec.help && <div className="help">{spec.help}</div>}
+            {helpFor(spec.key, spec.help) && <div className="help">{helpFor(spec.key, spec.help)}</div>}
           </div>
         );
       })}

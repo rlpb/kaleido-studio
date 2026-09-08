@@ -134,7 +134,7 @@ export interface LibraryItem {
 export interface Settings {
   hasKey: boolean;
   theme: 'dark' | 'light' | 'system';
-  language: 'it' | 'en';
+  language: string;
   libraryPath: string;
   favoriteModels: string[];
   lastMode: ModeId;

@@ -3,6 +3,7 @@ import { bridge, type KeyState } from './lib/api';
 import type { Catalog, Job, ModeId, Settings } from './lib/types';
 import { MODES } from './lib/modes';
 import { formatMoney } from './lib/pricing';
+import { I18nContext, closestLang, isLang, translator, type Lang } from './lib/i18n';
 import Icon, { type IconName } from './components/Icon';
 import Onboarding from './screens/Onboarding';
 import Studio from './screens/Studio';
@@ -32,6 +33,16 @@ export default function App() {
   const [route, setRoute] = useState<Route>({ kind: 'studio', mode: 'image' });
   const [booting, setBooting] = useState(true);
   const { toasts, push, dismiss } = useToasts();
+
+  // The stored value can be a full locale such as "it-IT" on first run, so it
+  // is narrowed to a language the app actually ships.
+  const lang: Lang = isLang(settings?.language) ? settings.language : closestLang(settings?.language);
+  const t = useMemo(() => translator(lang), [lang]);
+  const i18n = useMemo(() => ({ lang, t }), [lang, t]);
+
+  useEffect(() => {
+    document.documentElement.lang = lang;
+  }, [lang]);
 
   // --- boot ---------------------------------------------------------------
   useEffect(() => {
@@ -129,7 +140,7 @@ export default function App() {
       <div className="onboarding">
         <div className="row">
           <div className="spin" />
-          <span className="muted">Starting Kaleido…</span>
+          <span className="muted">{t('app.starting')}</span>
         </div>
       </div>
     );
@@ -137,10 +148,10 @@ export default function App() {
 
   if (!keyState?.valid) {
     return (
-      <>
+      <I18nContext.Provider value={i18n}>
         <Onboarding keyState={keyState} onSaved={onKeySaved} push={push} />
         <ToastStack toasts={toasts} dismiss={dismiss} />
-      </>
+      </I18nContext.Provider>
     );
   }
 
@@ -150,95 +161,97 @@ export default function App() {
     : (keyState.limitRemaining ?? null);
 
   return (
-    <div className="shell">
-      <aside className="sidebar">
-        <div className="brand">
-          <div className="brand-mark" />
-          <div className="brand-text">
-            <div className="brand-name">Kaleido</div>
-            <div className="brand-sub">Media studio</div>
+    <I18nContext.Provider value={i18n}>
+      <div className="shell">
+        <aside className="sidebar">
+          <div className="brand">
+            <div className="brand-mark" />
+            <div className="brand-text">
+              <div className="brand-name">Kaleido</div>
+              <div className="brand-sub">{t('app.subtitle')}</div>
+            </div>
           </div>
-        </div>
 
-        <div className="section-title">Generate</div>
-        {MODES.map((mode) => {
-          const count = catalog?.models[mode.id]?.length ?? 0;
-          const active = route.kind === 'studio' && route.mode === mode.id;
-          return (
+          <div className="section-title">{t('nav.generate')}</div>
+          {MODES.map((mode) => {
+            const count = catalog?.models[mode.id]?.length ?? 0;
+            const active = route.kind === 'studio' && route.mode === mode.id;
+            return (
+              <button
+                key={mode.id}
+                className={`nav-item${active ? ' active' : ''}`}
+                onClick={() => {
+                  setRoute({ kind: 'studio', mode: mode.id });
+                  void patchSettings({ lastMode: mode.id });
+                }}
+                title={t(`mode.${mode.id}.hint`)}
+                disabled={catalog !== null && count === 0}
+              >
+                <Icon name={MODE_ICONS[mode.id]} />
+                <span className="nav-label">{t(`mode.${mode.id}.label`)}</span>
+                <span className="nav-count">{catalog ? count : ''}</span>
+              </button>
+            );
+          })}
+
+          <div className="sidebar-foot">
             <button
-              key={mode.id}
-              className={`nav-item${active ? ' active' : ''}`}
-              onClick={() => {
-                setRoute({ kind: 'studio', mode: mode.id });
-                void patchSettings({ lastMode: mode.id });
-              }}
-              title={mode.hint}
-              disabled={catalog !== null && count === 0}
+              className={`nav-item${route.kind === 'library' ? ' active' : ''}`}
+              onClick={() => setRoute({ kind: 'library' })}
             >
-              <Icon name={MODE_ICONS[mode.id]} />
-              <span className="nav-label">{mode.label}</span>
-              <span className="nav-count">{catalog ? count : ''}</span>
+              <Icon name="library" />
+              <span className="nav-label">{t('nav.library')}</span>
             </button>
-          );
-        })}
+            <button
+              className={`nav-item${route.kind === 'settings' ? ' active' : ''}`}
+              onClick={() => setRoute({ kind: 'settings' })}
+            >
+              <Icon name="settings" />
+              <span className="nav-label">{t('nav.settings')}</span>
+            </button>
 
-        <div className="sidebar-foot">
-          <button
-            className={`nav-item${route.kind === 'library' ? ' active' : ''}`}
-            onClick={() => setRoute({ kind: 'library' })}
-          >
-            <Icon name="library" />
-            <span className="nav-label">Library</span>
-          </button>
-          <button
-            className={`nav-item${route.kind === 'settings' ? ' active' : ''}`}
-            onClick={() => setRoute({ kind: 'settings' })}
-          >
-            <Icon name="settings" />
-            <span className="nav-label">Settings</span>
-          </button>
-
-          <div className="balance">
-            <div className="spread">
-              <span className="faint">Credit</span>
-              <span className="mono">{formatMoney(balance)}</span>
-            </div>
-            <div className="spread">
-              <span className="faint">Spent here</span>
-              <span className="mono">{formatMoney(settings?.spendTotal ?? 0)}</span>
+            <div className="balance">
+              <div className="spread">
+                <span className="faint">{t('nav.credit')}</span>
+                <span className="mono">{formatMoney(balance)}</span>
+              </div>
+              <div className="spread">
+                <span className="faint">{t('nav.spentHere')}</span>
+                <span className="mono">{formatMoney(settings?.spendTotal ?? 0)}</span>
+              </div>
             </div>
           </div>
+        </aside>
+
+        <div className="main">
+          {route.kind === 'studio' && settings && (
+            <Studio
+              mode={route.mode}
+              catalog={catalog}
+              catalogError={catalogError}
+              settings={settings}
+              jobs={jobs}
+              activeJobs={activeJobs}
+              push={push}
+              reloadCatalog={loadCatalog}
+              patchSettings={patchSettings}
+              setSettings={setSettings}
+            />
+          )}
+          {route.kind === 'library' && <LibraryScreen push={push} />}
+          {route.kind === 'settings' && settings && (
+            <SettingsScreen
+              settings={settings}
+              keyState={keyState}
+              setSettings={setSettings}
+              onKeyChanged={onKeySaved}
+              push={push}
+            />
+          )}
         </div>
-      </aside>
 
-      <div className="main">
-        {route.kind === 'studio' && settings && (
-          <Studio
-            mode={route.mode}
-            catalog={catalog}
-            catalogError={catalogError}
-            settings={settings}
-            jobs={jobs}
-            activeJobs={activeJobs}
-            push={push}
-            reloadCatalog={loadCatalog}
-            patchSettings={patchSettings}
-            setSettings={setSettings}
-          />
-        )}
-        {route.kind === 'library' && <LibraryScreen push={push} />}
-        {route.kind === 'settings' && settings && (
-          <SettingsScreen
-            settings={settings}
-            keyState={keyState}
-            setSettings={setSettings}
-            onKeyChanged={onKeySaved}
-            push={push}
-          />
-        )}
+        <ToastStack toasts={toasts} dismiss={dismiss} />
       </div>
-
-      <ToastStack toasts={toasts} dismiss={dismiss} />
-    </div>
+    </I18nContext.Provider>
   );
 }

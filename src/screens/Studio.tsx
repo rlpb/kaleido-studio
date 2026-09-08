@@ -9,6 +9,8 @@ import InputAssets from '../components/InputAssets';
 import { MediaCard, type MediaRef } from '../components/MediaCard';
 import MediaViewer from '../components/MediaViewer';
 import Icon from '../components/Icon';
+import { useT } from '../lib/i18n';
+import type { Dict } from '../lib/locales/en';
 
 type Value = string | number | boolean;
 type Push = (text: string, tone?: 'info' | 'ok' | 'error') => void;
@@ -54,6 +56,7 @@ export default function Studio({
   patchSettings,
   setSettings,
 }: Props) {
+  const t = useT();
   const def = MODE_BY_ID[mode];
   const models = useMemo(() => catalog?.models[mode] ?? [], [catalog, mode]);
 
@@ -120,7 +123,7 @@ export default function Studio({
     try {
       await bridge.jobs.enqueue({ mode, modelId: model.id, prompt, params, inputs, batch }, model.name);
       void bridge.prompts.list().then(setHistory);
-      push(batch > 1 ? `${batch} runs queued` : 'Generation started', 'ok');
+      push(batch > 1 ? t('studio.queued', { n: batch }) : t('studio.started'), 'ok');
     } catch (err) {
       push(err instanceof Error ? err.message : String(err), 'error');
     }
@@ -164,7 +167,7 @@ export default function Studio({
 
   const savePreset = async () => {
     if (!model) return;
-    const name = window.prompt('Preset name', `${def.label} · ${model.name}`);
+    const name = window.prompt(t('studio.presetName'), `${t(`mode.${mode}.label`)} · ${model.name}`);
     if (!name) return;
     setPresets(
       await bridge.presets.save({
@@ -177,7 +180,7 @@ export default function Studio({
         createdAt: Date.now(),
       }),
     );
-    push('Preset saved', 'ok');
+    push(t('studio.presetSaved'), 'ok');
   };
 
   const modePresets = presets.filter((p) => p.mode === mode);
@@ -185,17 +188,17 @@ export default function Studio({
   return (
     <>
       <div className="topbar">
-        <h1>{def.label}</h1>
-        <span className="faint ellipsis">{def.hint}</span>
+        <h1>{t(`mode.${mode}.label`)}</h1>
+        <span className="faint ellipsis">{t(`mode.${mode}.hint`)}</span>
         <div className="spacer" />
         {activeJobs > 0 && (
           <span className="chip chip-accent">
-            <span className="spin sm" /> {activeJobs} running
+            <span className="spin sm" /> {t('studio.running', { n: activeJobs })}
           </span>
         )}
-        <button className="btn btn-ghost btn-sm" onClick={() => void reloadCatalog(true)} title="Reload the catalog from OpenRouter">
+        <button className="btn btn-ghost btn-sm" onClick={() => void reloadCatalog(true)} title={t('studio.reloadModelsTitle')}>
           <Icon name="refresh" />
-          Models
+          {t('studio.reloadModels')}
         </button>
       </div>
 
@@ -205,25 +208,27 @@ export default function Studio({
           {catalogError && (
             <div className="banner banner-danger">
               <Icon name="alert" />
-              <span>Catalog not loaded: {catalogError}</span>
+              <span>
+                {t('studio.catalogFailed')} {catalogError}
+              </span>
             </div>
           )}
 
           <div className="field">
-            <label>Model</label>
+            <label>{t('studio.model')}</label>
             {!catalog && (
               <div className="row">
-                <span className="spin" /> <span className="faint">Loading the catalog…</span>
+                <span className="spin" /> <span className="faint">{t('studio.loadingCatalog')}</span>
               </div>
             )}
             {catalog && models.length === 0 && (
-              <div className="faint">OpenRouter currently offers no model for this mode.</div>
+              <div className="faint">{t('studio.noModels')}</div>
             )}
             {model && (
               <button className="model-button" onClick={() => setPickerOpen(true)}>
                 <div className="model-button-text">
                   <div className="name">{model.name}</div>
-                  <div className="sub mono">{priceSummary(model)}</div>
+                  <div className="sub mono">{priceSummary(model, t)}</div>
                 </div>
                 <Icon name="chevronDown" />
               </button>
@@ -233,7 +238,7 @@ export default function Studio({
           {promptUseful && (
             <div className="field">
               <label htmlFor="prompt">
-                {mode === 'speech' ? 'Text to speak' : 'Prompt'}
+                {mode === 'speech' ? t('studio.textToSpeak') : t('studio.prompt')}
                 {promptNeeded && <span className="required"> *</span>}
               </label>
               <textarea
@@ -241,8 +246,8 @@ export default function Studio({
                 value={prompt}
                 placeholder={
                   mode === 'speech'
-                    ? 'Type the text you want spoken aloud…'
-                    : 'Describe what you want. The more specific about subject, light and framing, the more control you get.'
+                    ? t('studio.speechPlaceholder')
+                    : t('studio.promptPlaceholder')
                 }
                 onChange={(e) => setPrompt(e.target.value)}
               />
@@ -253,7 +258,7 @@ export default function Studio({
                     if (e.target.value) setPrompt(e.target.value);
                   }}
                 >
-                  <option value="">Reuse a recent prompt…</option>
+                  <option value="">{t('studio.reuseRecentPrompt')}</option>
                   {history.slice(0, 30).map((entry, i) => (
                     <option key={i} value={entry}>
                       {entry.slice(0, 90)}
@@ -267,7 +272,9 @@ export default function Studio({
           {def.needsInput && (
             <InputAssets
               kind={def.needsInput.kind}
-              label={def.needsInput.label}
+              // Only the four modes with needsInput reach this line, and those are
+              // exactly the ones with an .input key in the dictionary.
+              label={t(`mode.${mode}.input` as keyof Dict)}
               min={def.needsInput.min}
               max={def.needsInput.max}
               files={inputs}
@@ -277,13 +284,13 @@ export default function Studio({
           )}
 
           <div>
-            <div className="section-title">Model parameters</div>
+            <div className="section-title">{t('studio.modelParameters')}</div>
             <CapabilityForm params={model?.params ?? []} values={params} onChange={setParam} />
           </div>
 
           {modePresets.length > 0 && (
             <div className="field">
-              <label>Presets</label>
+              <label>{t('studio.presets')}</label>
               <select
                 value=""
                 onChange={(e) => {
@@ -295,7 +302,7 @@ export default function Studio({
                   setParams(preset.params);
                 }}
               >
-                <option value="">Apply a preset…</option>
+                <option value="">{t('studio.applyPreset')}</option>
                 {modePresets.map((preset) => (
                   <option key={preset.id} value={preset.id}>
                     {preset.name}
@@ -310,16 +317,16 @@ export default function Studio({
           <div className="run-bar">
             <div className="cost-box">
               <div className="spread">
-                <span className="cost-label">Estimated cost</span>
-                <span className={`chip ${BASIS_TONE[estimate.basis] ?? ''}`}>{estimate.basis}</span>
+                <span className="cost-label">{t('studio.estimatedCost')}</span>
+                <span className={`chip ${BASIS_TONE[estimate.basis] ?? ''}`}>{t(`basis.${estimate.basis}`)}</span>
               </div>
               <div className="cost-amount mono">{formatCost(estimate.total)}</div>
-              <div className="help">{estimate.detail}</div>
+              <div className="help">{t(estimate.detailKey, estimate.detailVars)}</div>
             </div>
 
             <div className="row">
               <div className="field batch">
-                <label htmlFor="batch">Count</label>
+                <label htmlFor="batch">{t('studio.count')}</label>
                 <input
                   id="batch"
                   type="number"
@@ -331,19 +338,19 @@ export default function Studio({
               </div>
               <button className="btn btn-primary btn-run" onClick={() => void run()} disabled={!canRun}>
                 <Icon name="sparkle" />
-                Generate
+                {t('studio.generate')}
                 <span className="kbd inverse">Ctrl ↵</span>
               </button>
             </div>
 
             <div className="row">
               <button className="btn btn-ghost btn-sm" onClick={() => void savePreset()} disabled={!model}>
-                Save preset
+                {t('studio.savePreset')}
               </button>
               <div className="spacer" />
               {!canRun && (
                 <span className="faint tiny">
-                  {promptNeeded && !prompt.trim() ? 'Prompt missing' : missingInputs ? 'Input files missing' : ''}
+                  {promptNeeded && !prompt.trim() ? t('studio.promptMissing') : missingInputs ? t('studio.inputsMissing') : ''}
                 </span>
               )}
             </div>
@@ -361,13 +368,13 @@ export default function Studio({
                       <strong className="small">{job.modelName}</strong>
                       <span className="faint mono tiny">{job.progress}</span>
                     </div>
-                    <div className="faint tiny ellipsis">{job.prompt || 'no prompt'}</div>
+                    <div className="faint tiny ellipsis">{job.prompt || t('studio.noPrompt')}</div>
                     <div className="bar">
                       <span />
                     </div>
                   </div>
                   <button className="btn btn-ghost btn-sm" onClick={() => void bridge.jobs.cancel(job.id)}>
-                    Cancel
+                    {t('studio.cancel')}
                   </button>
                 </div>
               ))}
@@ -385,22 +392,22 @@ export default function Studio({
                   </div>
                   <button
                     className="btn btn-ghost btn-icon"
-                    title="Copy the error"
+                    title={t('studio.copyError')}
                     onClick={() => {
                       void navigator.clipboard.writeText(job.error ?? '');
-                      push('Error copied', 'ok');
+                      push(t('studio.errorCopied'), 'ok');
                     }}
                   >
                     <Icon name="copy" />
                   </button>
-                  <button className="btn btn-sm" title="Run it again unchanged" onClick={() => void bridge.jobs.retry(job.id)}>
+                  <button className="btn btn-sm" title={t('studio.retryTitle')} onClick={() => void bridge.jobs.retry(job.id)}>
                     <Icon name="refresh" />
-                    Retry
+                    {t('studio.retry')}
                   </button>
                 </div>
               ))}
               <button className="btn btn-ghost btn-sm self-start" onClick={() => void bridge.jobs.clear()}>
-                Clear errors
+                {t('studio.clearErrors')}
               </button>
             </div>
           )}
@@ -408,8 +415,8 @@ export default function Studio({
           {results.length === 0 && pending.length === 0 ? (
             <div className="empty">
               <Icon name={def.outputKind === 'video' ? 'video' : def.outputKind === 'audio' ? 'music' : 'image'} size={30} />
-              <div>Nothing generated in this session yet</div>
-              <div className="tiny">Earlier results stay in the Library.</div>
+              <div>{t('studio.emptyTitle')}</div>
+              <div className="tiny">{t('studio.emptyHint')}</div>
             </div>
           ) : (
             <div className="grid">
@@ -422,7 +429,7 @@ export default function Studio({
                   onUsePrompt={setPrompt}
                   onReuse={(ref) => {
                     if (def.needsInput) setInputs([ref.path]);
-                    else push('This mode takes no input files', 'info');
+                    else push(t('studio.noInputMode'), 'info');
                   }}
                 />
               ))}

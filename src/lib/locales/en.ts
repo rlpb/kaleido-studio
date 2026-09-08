@@ -94,6 +94,7 @@ const en = {
   'basis.free': 'free',
   'basis.unknown': 'unknown',
   'cost.noModel': 'No model selected',
+  'cost.listPrice': '{rate}/s × {duration}s × {runs}',
   'cost.measured': 'What the last identical run actually cost',
   'cost.measuredBatch': 'What the last identical run actually cost, × {n}',
   'cost.noListPrice': 'No list price on this model',

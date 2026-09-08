@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { bridge } from '../lib/api';
 import type { MediaKind } from '../lib/types';
 import Icon from './Icon';
+import { useT } from '../lib/i18n';
 
 interface Props {
   kind: MediaKind;
@@ -18,6 +19,7 @@ const basename = (p: string) => p.split(/[\\/]/).pop() ?? p;
 
 /** File chooser plus drop target for the assets a mode needs as input. */
 export default function InputAssets({ kind, label, min, max, files, onChange, frameMode }: Props) {
+  const t = useT();
   const [over, setOver] = useState(false);
 
   const add = (paths: string[]) => {
@@ -65,10 +67,10 @@ export default function InputAssets({ kind, label, min, max, files, onChange, fr
                   <Icon name="music" size={22} />
                 </div>
               )}
-              <button className="remove" title="Remove" onClick={() => onChange(files.filter((f) => f !== path))}>
+              <button className="remove" title={t('input.remove')} onClick={() => onChange(files.filter((f) => f !== path))}>
                 <Icon name="close" size={11} />
               </button>
-              <div className="badge">{frameMode ? (index === 0 ? 'first' : 'last') : basename(path).slice(0, 10)}</div>
+              <div className="badge">{frameMode ? (index === 0 ? t('input.first') : t('input.last')) : basename(path).slice(0, 10)}</div>
             </div>
           ))}
         </div>
@@ -87,15 +89,17 @@ export default function InputAssets({ kind, label, min, max, files, onChange, fr
         >
           <Icon name="plus" size={18} />
           <span>
-            Drop {max > 1 ? 'files' : 'a file'} here, or click to browse
-            {frameMode && files.length === 1 ? ' (the second becomes the closing frame)' : ''}
+            {max > 1 ? t('input.dropFiles') : t('input.dropFile')}
+            {frameMode && files.length === 1 ? ` (${t('input.secondIsClosing')})` : ''}
           </span>
         </div>
       )}
 
       {files.length > 0 && (
         <div className="help">
-          {files.length} file{files.length === 1 ? '' : 's'} selected{max > files.length ? `, up to ${max}` : ''}
+          {max > files.length
+            ? t('input.selectedUpTo', { n: files.length, max })
+            : t('input.selected', { n: files.length })}
         </div>
       )}
     </div>
