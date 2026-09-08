@@ -130,7 +130,10 @@ export function formatCost(value: number | null | undefined): string {
 /** Like formatCost, but a zero balance reads as money, not as a free model. */
 export function formatMoney(value: number | null | undefined): string {
   if (value === null || value === undefined) return '—';
-  return `$${value.toFixed(value < 1 && value > 0 ? 4 : 2)}`;
+  // Small amounts need more places, but never as trailing zeros: $0.1200 reads
+  // like a precision the number does not have.
+  const text = value > 0 && value < 1 ? value.toFixed(4).replace(/0+$/, '') : value.toFixed(2);
+  return `$${text.replace(/\.$/, '')}`;
 }
 
 export function formatBytes(bytes: number): string {

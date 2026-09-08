@@ -1,4 +1,3 @@
-import { useEffect } from 'react';
 import { bridge } from '../lib/api';
 import type { MediaKind } from '../lib/types';
 import { formatCost } from '../lib/pricing';
@@ -130,57 +129,6 @@ export function MediaCard({ item, onOpen, onReuse, onUsePrompt, onToggleFavorite
             </button>
           )}
         </div>
-      </div>
-    </div>
-  );
-}
-
-interface ViewerProps {
-  item: MediaRef;
-  onClose: () => void;
-  push: Push;
-}
-
-export function MediaViewer({ item, onClose, push }: ViewerProps) {
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
-
-  const url = bridge.mediaUrl(item.path);
-
-  return (
-    <div className="viewer">
-      <div className="viewer-head">
-        <strong>{item.modelName}</strong>
-        <span className="faint ellipsis">{item.prompt}</span>
-        <div className="spacer" />
-        <button
-          className="btn btn-sm"
-          onClick={async () => {
-            const saved = await bridge.library.exportCopy(item.path);
-            if (saved) push('Copy saved', 'ok');
-          }}
-        >
-          <Icon name="download" />
-          Save a copy
-        </button>
-        <button className="btn btn-sm" onClick={() => void bridge.library.open(item.path)}>
-          <Icon name="external" />
-          Open externally
-        </button>
-        <button className="btn btn-sm" onClick={onClose}>
-          Close <span className="kbd">Esc</span>
-        </button>
-      </div>
-      <div className="viewer-body">
-        {item.kind === 'image' && <img src={url} alt={item.prompt} />}
-        {item.kind === 'video' && <video src={url} controls autoPlay loop />}
-        {item.kind === 'audio' && <audio src={url} controls autoPlay className="viewer-audio" />}
-        {item.kind === 'text' && <pre>{item.text}</pre>}
       </div>
     </div>
   );
