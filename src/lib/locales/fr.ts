@@ -8,6 +8,14 @@ const fr: Dict = {
   'nav.library': 'Bibliothèque',
   'nav.settings': 'Réglages',
   'nav.credit': 'Crédit',
+  'nav.creditOnKey':
+    "Solde de la clé",
+  'nav.creditKeyLimited':
+    "Cette clé a sa propre limite de dépense, plus basse que le crédit du compte.",
+  'settings.keyLimitRemaining':
+    "Restant sur la limite de la clé",
+  'settings.keyLimitHelp':
+    "Cette clé porte une limite de dépense de {limit}. Une fois épuisée, les requêtes sont refusées même avec du crédit sur le compte, et certains fournisseurs refusent la sortie audio en dessous de $0.50 de solde disponible. La limite se change sur la page des clés OpenRouter.",
   'nav.spentHere': 'Dépensé ici',
 
   'mode.image.label': 'Images',
@@ -95,6 +103,10 @@ const fr: Dict = {
   'cost.rate':
     'Facturé à {rate}. Le nombre de tokens dépend du résultat, le coût exact apparaît donc à la fin.',
   'cost.unknown': 'Le coût exact apparaît à la fin de l’exécution.',
+  'picker.priceUnpublished':
+    "prix non publié",
+  'cost.unpublished':
+    "OpenRouter ne publie aucun prix pour ce modèle, ce qui ne veut pas dire qu'il est gratuit : certains modèles sans tarif affiché facturent quand même. Le coût réel apparaît à la fin, et la prochaine estimation s'en servira.",
   'cost.free': 'gratuit',
 
   'picker.title': 'Choisir un modèle',

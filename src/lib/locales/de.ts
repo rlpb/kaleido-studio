@@ -8,6 +8,14 @@ const de: Dict = {
   'nav.library': 'Bibliothek',
   'nav.settings': 'Einstellungen',
   'nav.credit': 'Guthaben',
+  'nav.creditOnKey':
+    "Guthaben des Schlüssels",
+  'nav.creditKeyLimited':
+    "Dieser Schlüssel hat ein eigenes Ausgabenlimit, niedriger als das Kontoguthaben.",
+  'settings.keyLimitRemaining':
+    "Rest des Schlüssellimits",
+  'settings.keyLimitHelp':
+    "Dieser Schlüssel hat ein Ausgabenlimit von {limit}. Ist es aufgebraucht, werden Anfragen auch bei vorhandenem Kontoguthaben abgelehnt, und manche Anbieter verweigern Audioausgabe unter $0.50 verfügbarem Guthaben. Das Limit wird auf der OpenRouter-Schlüsselseite geändert.",
   'nav.spentHere': 'Hier ausgegeben',
 
   'mode.image.label': 'Bilder',
@@ -95,6 +103,10 @@ const de: Dict = {
   'cost.rate':
     'Abgerechnet mit {rate}. Die Tokenzahl hängt vom Ergebnis ab, die genauen Kosten erscheinen daher am Ende.',
   'cost.unknown': 'Die genauen Kosten erscheinen am Ende des Durchlaufs.',
+  'picker.priceUnpublished':
+    "Preis nicht veröffentlicht",
+  'cost.unpublished':
+    "OpenRouter veröffentlicht für dieses Modell keinen Preis, was nicht heißt, dass es kostenlos ist: manche Modelle ohne Listenpreis rechnen trotzdem ab. Die tatsächlichen Kosten erscheinen am Ende und fließen in die nächste Schätzung ein.",
   'cost.free': 'kostenlos',
 
   'picker.title': 'Modell wählen',

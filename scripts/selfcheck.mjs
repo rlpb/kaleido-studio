@@ -143,15 +143,19 @@ await check('every price the interface shows carries its currency', () => {
     'picker.perVideoSecondRange': '{min}-{max} / video second',
     'picker.perMillionTokens': '{rate} / M tokens',
     'picker.free': 'free',
+    'picker.priceUnpublished': 'price not published',
   };
   const t = (key, vars = {}) =>
     (templates[key] ?? key).replace(/\{(\w+)\}/g, (whole, name) => (name in vars ? String(vars[name]) : whole));
 
+  // "free" and "price not published" are statements about billing, not amounts,
+  // so only the summaries that quote a figure are held to carrying a currency.
+  const notAnAmount = new Set([templates['picker.free'], templates['picker.priceUnpublished']]);
   const currency = String.fromCharCode(36);
   for (const mode of ['image', 'video']) {
     for (const model of catalog.models[mode]) {
       const summary = pricing.priceSummary(model, t);
-      if (summary === 'free') continue;
+      if (notAnAmount.has(summary)) continue;
       assert.ok(summary.includes(currency), `${model.id}: price without a currency: "${summary}"`);
     }
   }
@@ -163,6 +167,25 @@ await check('every price the interface shows carries its currency', () => {
     String(est.detailVars?.rate ?? '').startsWith(currency),
     `the list-price detail lost its currency: ${JSON.stringify(est.detailVars)}`,
   );
+});
+
+await check('nothing is called free unless OpenRouter says so', () => {
+  // google/lyria-3-pro-preview lists {"prompt":"0","completion":"0"} and then
+  // bills real money per generation. All-zero pricing means the price was not
+  // published, which is a different claim from free, and only the ":free"
+  // suffix supports the second one.
+  for (const mode of modes) {
+    for (const model of catalog.models[mode]) {
+      if (!model.price.free) continue;
+      assert.ok(model.id.endsWith(':free'), `${model.id} is marked free without the :free suffix`);
+    }
+  }
+
+  const lyria = catalog.models.audio.find((m) => m.id.startsWith('google/lyria'));
+  if (lyria) {
+    assert.equal(lyria.price.free, false, 'the model that bills without a listed price is marked free again');
+    assert.equal(lyria.price.unpublished, true, 'its price should read as unpublished');
+  }
 });
 
 console.log('\nHTTP client');
