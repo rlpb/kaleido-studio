@@ -1,6 +1,6 @@
 {
   "name": "kaleido-studio",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "description": "Desktop studio for AI media generation on OpenRouter: images, image editing, video, speech and transcription in one app.",
   "private": true,
   "type": "module",
