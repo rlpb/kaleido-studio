@@ -5,7 +5,10 @@
   "private": true,
   "type": "module",
   "main": "dist-electron/main.cjs",
-  "author": "Kaleido Studio contributors",
+  "author": {
+    "name": "Kaleido Studio contributors",
+    "email": "rlpb@users.noreply.github.com"
+  },
   "license": "MIT",
   "scripts": {
     "dev": "concurrently -k -n vite,electron -c cyan,magenta \"vite\" \"npm:dev:electron\"",
@@ -54,5 +57,6 @@
     "transcription",
     "electron",
     "desktop"
-  ]
+  ],
+  "desktopName": "kaleido-studio.desktop"
 }
