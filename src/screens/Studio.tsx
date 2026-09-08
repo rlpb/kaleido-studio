@@ -392,6 +392,10 @@ export default function Studio({
                   >
                     <Icon name="copy" />
                   </button>
+                  <button className="btn btn-sm" title="Run it again unchanged" onClick={() => void bridge.jobs.retry(job.id)}>
+                    <Icon name="refresh" />
+                    Retry
+                  </button>
                 </div>
               ))}
               <button className="btn btn-ghost btn-sm self-start" onClick={() => void bridge.jobs.clear()}>

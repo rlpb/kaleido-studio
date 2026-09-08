@@ -47,6 +47,7 @@ interface Bridge {
     enqueue(req: JobRequest, modelName: string): Promise<Job[]>;
     list(): Promise<Job[]>;
     cancel(id: string): Promise<boolean>;
+    retry(id: string): Promise<Job | null>;
     clear(): Promise<Job[]>;
     onUpdate(handler: (job: Job) => void): () => void;
   };
