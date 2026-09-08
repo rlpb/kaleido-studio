@@ -1124,41 +1124,136 @@ select {
 .viewer {
   position: fixed;
   inset: 0;
-  background: rgb(0 0 0 / 90%);
+  /* Near-opaque: at 90% the app behind stayed legible and competed with the
+     image the viewer exists to show. */
+  background: rgb(6 7 10 / 97%);
+  backdrop-filter: blur(8px);
   display: flex;
   flex-direction: column;
   z-index: 60;
+  color: #f2f4f8;
 }
 
-.viewer-head {
+.viewer-head,
+.viewer-foot {
   display: flex;
   align-items: center;
   gap: 10px;
+  flex: none;
   padding: 12px 16px;
-  color: #fff;
+}
+
+.viewer-foot {
+  padding-top: 0;
+  min-height: 42px;
+}
+
+.viewer-title {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+  max-width: 55%;
+}
+
+/* The scrim is not a themed surface, so the controls on it carry their own
+   contrast instead of inheriting panel tokens that vanish against black. */
+.viewer .btn {
+  background: rgb(255 255 255 / 9%);
+  border-color: rgb(255 255 255 / 16%);
+  color: #f2f4f8;
+}
+.viewer .btn:hover:not(:disabled) {
+  background: rgb(255 255 255 / 16%);
+  border-color: rgb(255 255 255 / 26%);
+}
+.viewer .chip {
+  background: rgb(255 255 255 / 8%);
+  border-color: rgb(255 255 255 / 16%);
+  color: #d7dbe4;
+}
+.viewer .faint {
+  color: rgb(242 244 248 / 55%);
+}
+.viewer .kbd {
+  border-color: rgb(255 255 255 / 28%);
+  color: rgb(242 244 248 / 65%);
 }
 
 .viewer-body {
   flex: 1;
-  display: grid;
-  place-items: center;
-  padding: 0 24px 24px;
   min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 16px 8px;
+  cursor: zoom-out;
+  overflow: hidden;
 }
 
-.viewer-body img,
-.viewer-body video {
+.viewer-body.zoomed {
+  cursor: grab;
+}
+.viewer-body.zoomed:active {
+  cursor: grabbing;
+}
+
+.viewer-stage {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.viewer-stage img,
+.viewer-stage video {
   max-width: 100%;
   max-height: 100%;
   object-fit: contain;
   border-radius: 8px;
+  /* No transition while dragging, or the image lags behind the pointer. */
+  transition: transform 0.08s linear;
+  will-change: transform;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.viewer-nav {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: rgb(255 255 255 / 8%);
+  border: 1px solid rgb(255 255 255 / 14%);
+  color: #f2f4f8;
+  transition:
+    background 0.14s ease,
+    transform 0.1s ease;
+}
+.viewer-nav:hover {
+  background: rgb(255 255 255 / 18%);
+}
+.viewer-nav:active {
+  transform: scale(0.94);
+}
+.viewer-nav.prev svg {
+  transform: rotate(90deg);
+}
+.viewer-nav.next svg {
+  transform: rotate(-90deg);
 }
 
 .viewer-audio {
   width: min(620px, 90vw);
 }
 
-.viewer-body pre {
+.viewer-stage pre {
   max-width: 900px;
   max-height: 100%;
   overflow: auto;
@@ -1169,6 +1264,7 @@ select {
   white-space: pre-wrap;
   font-size: 12.5px;
   line-height: 1.6;
+  cursor: text;
 }
 
 /* ==========================================================================

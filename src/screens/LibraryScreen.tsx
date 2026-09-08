@@ -3,7 +3,8 @@ import { bridge } from '../lib/api';
 import type { LibraryItem, MediaKind, ModeId } from '../lib/types';
 import { MODES } from '../lib/modes';
 import { formatBytes, formatCost } from '../lib/pricing';
-import { MediaCard, MediaViewer, type MediaRef } from '../components/MediaCard';
+import { MediaCard } from '../components/MediaCard';
+import MediaViewer from '../components/MediaViewer';
 import Icon from '../components/Icon';
 
 type Push = (text: string, tone?: 'info' | 'ok' | 'error') => void;
@@ -18,7 +19,7 @@ export default function LibraryScreen({ push }: { push: Push }) {
   const [kind, setKind] = useState<MediaKind | 'all'>('all');
   const [favoritesOnly, setFavoritesOnly] = useState(false);
   const [limit, setLimit] = useState(PAGE);
-  const [viewing, setViewing] = useState<MediaRef | null>(null);
+  const [viewing, setViewing] = useState<number | null>(null);
   const [stats, setStats] = useState<{
     count: number;
     byKind: Record<string, number>;
@@ -130,7 +131,7 @@ export default function LibraryScreen({ push }: { push: Push }) {
                   key={item.id}
                   item={item}
                   push={push}
-                  onOpen={setViewing}
+                  onOpen={(ref) => setViewing(items.findIndex((i) => i.id === ref.id))}
                   onToggleFavorite={async (ref) => {
                     await bridge.library.update(ref.id, { favorite: !ref.favorite });
                     void load();
@@ -156,7 +157,9 @@ export default function LibraryScreen({ push }: { push: Push }) {
         )}
       </div>
 
-      {viewing && <MediaViewer item={viewing} onClose={() => setViewing(null)} push={push} />}
+      {viewing !== null && viewing >= 0 && (
+        <MediaViewer items={items} index={viewing} onIndex={setViewing} onClose={() => setViewing(null)} push={push} />
+      )}
     </>
   );
 }

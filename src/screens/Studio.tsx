@@ -6,7 +6,8 @@ import { estimateCost, formatCost, priceSummary } from '../lib/pricing';
 import ModelPicker from '../components/ModelPicker';
 import CapabilityForm from '../components/CapabilityForm';
 import InputAssets from '../components/InputAssets';
-import { MediaCard, MediaViewer, type MediaRef } from '../components/MediaCard';
+import { MediaCard, type MediaRef } from '../components/MediaCard';
+import MediaViewer from '../components/MediaViewer';
 import Icon from '../components/Icon';
 
 type Value = string | number | boolean;
@@ -62,7 +63,7 @@ export default function Studio({
   const [inputs, setInputs] = useState<string[]>([]);
   const [batch, setBatch] = useState(1);
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [viewing, setViewing] = useState<MediaRef | null>(null);
+  const [viewing, setViewing] = useState<number | null>(null);
   const [presets, setPresets] = useState<Preset[]>([]);
   const [history, setHistory] = useState<string[]>([]);
 
@@ -417,7 +418,7 @@ export default function Studio({
                   key={item.id}
                   item={item}
                   push={push}
-                  onOpen={setViewing}
+                  onOpen={(ref) => setViewing(results.findIndex((r) => r.id === ref.id))}
                   onUsePrompt={setPrompt}
                   onReuse={(ref) => {
                     if (def.needsInput) setInputs([ref.path]);
@@ -444,7 +445,9 @@ export default function Studio({
         />
       )}
 
-      {viewing && <MediaViewer item={viewing} onClose={() => setViewing(null)} push={push} />}
+      {viewing !== null && viewing >= 0 && (
+        <MediaViewer items={results} index={viewing} onIndex={setViewing} onClose={() => setViewing(null)} push={push} />
+      )}
     </>
   );
 }
