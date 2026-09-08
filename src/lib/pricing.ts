@@ -56,11 +56,11 @@ export function priceSummary(model: ModelInfo, t: Translate): string {
     const min = Math.min(...rates);
     const max = Math.max(...rates);
     return min === max
-      ? t('picker.perVideoSecond', { rate: `${significant(min)}` })
-      : t('picker.perVideoSecondRange', { min: `${significant(min)}`, max: `${significant(max)}` });
+      ? t('picker.perVideoSecond', { rate: `$${significant(min)}` })
+      : t('picker.perVideoSecondRange', { min: `$${significant(min)}`, max: `$${significant(max)}` });
   }
   const perToken = model.price.perImageToken ?? model.price.perAudioOutputToken ?? model.price.perInputToken;
-  if (perToken) return t('picker.perMillionTokens', { rate: `${significant(perToken * 1_000_000)}` });
+  if (perToken) return t('picker.perMillionTokens', { rate: `$${significant(perToken * 1_000_000)}` });
   return t('picker.free');
 }
 
@@ -97,7 +97,7 @@ export function estimateCost(
         total: rate * duration * runs,
         basis: 'list price',
         detailKey: 'cost.listPrice',
-        detailVars: { rate: `${significant(rate)}`, duration, runs },
+        detailVars: { rate: `$${significant(rate)}`, duration, runs },
       };
     }
   }

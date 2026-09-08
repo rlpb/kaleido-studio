@@ -1,0 +1,129 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to build"
+        required: true
+
+permissions:
+  contents: write
+
+env:
+  TAG: ${{ github.event.inputs.tag || github.ref_name }}
+
+concurrency:
+  group: release-${{ github.event.inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: types, config and live API
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref_name }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run check:config
+      - run: npm run check
+
+      # A tag whose version does not match package.json produces installers
+      # named after one version and downloaded from another.
+      - name: Tag matches package.json
+        shell: bash
+        run: |
+          declared="v$(node -p "require('./package.json').version")"
+          if [ "$declared" != "$TAG" ]; then
+            echo "::error::package.json says $declared but the tag is $TAG"
+            exit 1
+          fi
+          echo "$declared matches the tag"
+
+  package:
+    name: package (${{ matrix.os }})
+    needs: verify
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref_name }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+      - run: npm run build
+
+      - name: Build installers
+        run: npx electron-builder --publish never
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kaleido-${{ matrix.os }}
+          path: |
+            release/*.exe
+            release/*.dmg
+            release/*.AppImage
+            release/*.deb
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: publish the release
+    needs: package
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref_name }}
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: List what will be attached
+        run: find artifacts -type f -printf '%p  %s bytes\n'
+
+      - name: Notes from the changelog
+        id: notes
+        shell: bash
+        run: |
+          version="${TAG#v}"
+          # Everything between this version's heading and the next one.
+          body=$(awk -v v="$version" '
+            $0 ~ "^## \\[" v "\\]" { found = 1; next }
+            found && /^## \[/ { exit }
+            found { print }
+          ' CHANGELOG.md)
+          if [ -z "$(echo "$body" | tr -d '[:space:]')" ]; then
+            echo "::warning::CHANGELOG.md has no section for $version, falling back to generated notes"
+            echo "generated=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "generated=false" >> "$GITHUB_OUTPUT"
+            { echo 'body<<KALEIDO_EOF'; echo "$body"; echo 'KALEIDO_EOF'; } >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.TAG }}
+          name: Kaleido Studio ${{ env.TAG }}
+          body: ${{ steps.notes.outputs.body }}
+          generate_release_notes: ${{ steps.notes.outputs.generated == 'true' }}
+          files: artifacts/**/*
+          fail_on_unmatched_files: true

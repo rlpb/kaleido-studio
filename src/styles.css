@@ -671,7 +671,7 @@ select {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 16px;
+  padding: 16px 16px 22px;
   display: flex;
   flex-direction: column;
   gap: 18px;
@@ -943,6 +943,11 @@ select {
 .run-bar {
   flex: none;
   background: var(--surface);
+  /* Marks the boundary, so a field cut by the scroll edge reads as more
+     content below rather than as a broken layout. */
+  box-shadow: 0 -8px 12px -8px rgb(0 0 0 / 22%);
+  position: relative;
+  z-index: 1;
   padding: 12px 16px 14px;
   border-top: 1px solid var(--border);
   display: flex;
