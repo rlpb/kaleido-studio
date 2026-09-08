@@ -23,6 +23,9 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run typecheck
+      # Catches an unknown electron-builder key here instead of in three
+      # packaging jobs that each fail minutes in without naming it.
+      - run: npm run check:config
       # The self-check calls the public OpenRouter catalog routes, no key needed.
       - run: npm run check
 
