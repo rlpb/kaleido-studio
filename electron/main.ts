@@ -42,6 +42,20 @@ function serveMedia(request: Request): Promise<Response> {
   return net.fetch(pathToFileURL(resolved).toString());
 }
 
+/** Matches the .topbar height in the stylesheet, so the controls line up. */
+const TOP_BAR_HEIGHT = 50;
+
+/**
+ * The overlay is painted by the system, not by CSS, so it has to be told the
+ * theme separately and repainted whenever the theme changes. These values are
+ * the --surface and --text-muted tokens for each theme.
+ */
+function overlayColours(theme: 'dark' | 'light'): { color: string; symbolColor: string } {
+  return theme === 'light'
+    ? { color: '#ffffff', symbolColor: '#545c70' }
+    : { color: '#12151d', symbolColor: '#9aa3b8' };
+}
+
 function createWindow(): void {
   mainWindow = new BrowserWindow({
     width: 1440,
@@ -52,7 +66,14 @@ function createWindow(): void {
     backgroundColor: '#0b0d12',
     // The menu stays reachable with Alt but does not frame the app by default.
     autoHideMenuBar: true,
-    titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
+    // One bar instead of two: the window controls are drawn over the app's own
+    // top bar rather than in a separate system strip above it. The overlay
+    // keeps the native buttons, so snapping, maximise and the system menu all
+    // behave exactly as Windows expects.
+    titleBarStyle: 'hidden',
+    ...(process.platform === 'darwin'
+      ? { trafficLightPosition: { x: 16, y: 17 } }
+      : { titleBarOverlay: { ...overlayColours('dark'), height: TOP_BAR_HEIGHT } }),
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
@@ -253,6 +274,14 @@ function registerIpc(): void {
   });
 
   handle('files:mode', (mode: ModeId) => mode);
+  handle('window:theme', (theme) => {
+    // Windows and Linux paint the caption buttons themselves, so a theme change
+    // has to be handed to them or the strip stays the previous colour.
+    if (process.platform === 'darwin' || !mainWindow || mainWindow.isDestroyed()) return false;
+    mainWindow.setTitleBarOverlay({ ...overlayColours(theme === 'light' ? 'light' : 'dark'), height: TOP_BAR_HEIGHT });
+    return true;
+  });
+
   handle('app:openExternal', (url: string) => {
     if (/^https?:\/\//i.test(url)) void shell.openExternal(url);
     return true;

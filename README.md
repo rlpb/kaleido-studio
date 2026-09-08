@@ -116,9 +116,6 @@ adds up in the spend counter. The estimator is deliberately unable to produce a
 number it cannot derive from catalog data or a previous measurement, and there
 is a check that fails if it ever starts guessing.
 
-<div align="center">
-<img src="docs/screenshot-library.png" alt="The library, with generated images and audio, per-file cost and disk usage" width="900">
-</div>
 
 ## Key security
 

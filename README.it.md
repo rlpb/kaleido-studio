@@ -121,9 +121,6 @@ sommato nel contatore di spesa. Lo stimatore è deliberatamente incapace di
 produrre un numero che non può ricavare dal catalogo o da una misura precedente,
 e c'è un controllo che fallisce se dovesse iniziare a indovinare.
 
-<div align="center">
-<img src="docs/screenshot-library.png" alt="La libreria, con immagini e audio generati, costo per file e spazio occupato" width="900">
-</div>
 
 ## Sicurezza della chiave
 

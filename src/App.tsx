@@ -44,6 +44,11 @@ export default function App() {
     document.documentElement.lang = lang;
   }, [lang]);
 
+  // The stylesheet reserves space for the caption buttons per platform.
+  useEffect(() => {
+    document.documentElement.dataset.platform = bridge.platform;
+  }, []);
+
   // --- boot ---------------------------------------------------------------
   useEffect(() => {
     let cancelled = false;
@@ -76,6 +81,10 @@ export default function App() {
             : 'dark'
           : settings.theme;
       document.documentElement.dataset.theme = theme;
+      // The caption buttons are painted by the system, not by CSS, so the
+      // theme has to be handed to them separately or the strip keeps the
+      // previous colour while everything around it changes.
+      void bridge.window.setTheme(theme).catch(() => undefined);
     };
     apply();
     if (settings.theme !== 'system') return;

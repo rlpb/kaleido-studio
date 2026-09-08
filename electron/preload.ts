@@ -71,6 +71,11 @@ const api = {
     /** Electron removed File.path, so a dropped file is resolved here instead. */
     pathFor: (file: File) => webUtils.getPathForFile(file),
   },
+  window: {
+    setTheme: (theme: 'dark' | 'light') => call<boolean>('window:theme', theme),
+  },
+  /** Read here rather than over IPC, because the layout needs it on first paint. */
+  platform: process.platform,
   app: {
     info: () => call<any>('app:info'),
     openExternal: (url: string) => call<boolean>('app:openExternal', url),
