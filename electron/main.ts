@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import type { Catalog, JobRequest, LibraryItem, ModeId, Preset, Settings } from '../src/lib/types';
-import { fetchCatalog, checkKey, getCredits } from './openrouter';
+import { fetchCatalog, checkKey, getCredits, setFetch } from './openrouter';
 import * as store from './store';
 import * as library from './library';
 import { runner } from './jobs';
@@ -187,6 +187,7 @@ function registerIpc(): void {
     runner.cancel(id);
     return true;
   });
+  handle('jobs:retry', (id: string) => runner.retry(id));
   handle('jobs:clear', () => {
     runner.clearFinished();
     return runner.list();
@@ -262,6 +263,9 @@ if (!app.requestSingleInstanceLock()) {
   });
 
   void app.whenReady().then(() => {
+    // Chromium's network stack rather than Node's: system proxy and certificate
+    // store, and TCP keep-alive on the socket that waits out a generation.
+    setFetch((url, init) => net.fetch(url, init));
     protocol.handle(MEDIA_SCHEME, serveMedia);
     registerIpc();
     buildMenu();

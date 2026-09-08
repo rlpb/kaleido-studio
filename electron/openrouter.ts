@@ -10,6 +10,21 @@ const APP_HEADERS = {
 const CATALOG_TIMEOUT_MS = 60_000;
 const GENERATION_TIMEOUT_MS = 10 * 60_000;
 
+type FetchLike = (url: string, init?: RequestInit) => Promise<Response>;
+
+let fetchImpl: FetchLike = (url, init) => fetch(url, init);
+
+/**
+ * Lets the main process swap in Electron's net.fetch, which runs on Chromium's
+ * network stack: it follows the system proxy and certificate store, and enables
+ * TCP keep-alive on its sockets, so a connection held open while a model works
+ * is less likely to be dropped by a NAT or middlebox timeout. The default stays
+ * the global fetch so this module still runs under plain Node in the checks.
+ */
+export function setFetch(impl: FetchLike): void {
+  fetchImpl = impl;
+}
+
 export class OpenRouterError extends Error {
   constructor(
     message: string,
@@ -88,7 +103,7 @@ function headers(key: string | null, extra: Record<string, string> = {}): Record
 /** Every request goes through here so no transport failure is reported bare. */
 async function send(url: string, init: RequestInit, timeoutMs: number): Promise<Response> {
   try {
-    return await fetch(url, { ...init, signal: AbortSignal.timeout(timeoutMs) });
+    return await fetchImpl(url, { ...init, signal: AbortSignal.timeout(timeoutMs) });
   } catch (err) {
     throw networkError(err, timeoutMs);
   }

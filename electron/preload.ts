@@ -34,6 +34,7 @@ const api = {
     enqueue: (req: unknown, modelName: string) => call<Job[]>('jobs:enqueue', req, modelName),
     list: () => call<Job[]>('jobs:list'),
     cancel: (id: string) => call<boolean>('jobs:cancel', id),
+    retry: (id: string) => call<Job | null>('jobs:retry', id),
     clear: () => call<Job[]>('jobs:clear'),
     onUpdate: (handler: (job: Job) => void) => {
       const listener = (_e: unknown, job: Job) => handler(job);

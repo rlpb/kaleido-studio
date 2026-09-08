@@ -194,6 +194,24 @@ export class JobRunner {
     this.emit({ ...job, status: 'cancelled', progress: 'Cancelled', finishedAt: Date.now() });
   }
 
+  /**
+   * Re-runs a finished job with the identical configuration. Transport failures
+   * are retried on purpose rather than automatically: a socket that died after
+   * the request was accepted may already have been billed, so repeating the
+   * spend stays the user's decision.
+   */
+  retry(id: string): Job | null {
+    const job = this.jobs.get(id);
+    if (!job) return null;
+    this.jobs.delete(id);
+    this.cancelled.delete(id);
+    const [created] = this.enqueue(
+      { mode: job.mode, modelId: job.modelId, prompt: job.prompt, params: job.params, inputs: job.inputs, batch: 1 },
+      job.modelName,
+    );
+    return created ?? null;
+  }
+
   /** Enqueues one job per requested batch item and starts as many as allowed. */
   enqueue(req: JobRequest, modelName: string): Job[] {
     const created: Job[] = [];

@@ -134,6 +134,36 @@ await check('the cost signature ignores parameters that do not move the price', 
   assert.notEqual(a, pricing.costKeyFor('x/y', { resolution: '4K', seed: 1 }));
 });
 
+console.log('\nHTTP client');
+
+await check('setFetch is honoured, so the injected client is the one used', async () => {
+  const calls = [];
+  api.setFetch(async (url) => {
+    calls.push(url);
+    return new Response(JSON.stringify({ data: { label: 'stub' } }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    });
+  });
+  const status = await api.checkKey('stub-key');
+  assert.equal(calls.length, 1, 'the injected client was never called');
+  assert.ok(calls[0].endsWith('/key'), `unexpected URL: ${calls[0]}`);
+  assert.equal(status.valid, true);
+  assert.equal(status.label, 'stub');
+});
+
+await check('a transport failure names its cause instead of "fetch failed"', async () => {
+  api.setFetch(async () => {
+    const err = new TypeError('fetch failed');
+    err.cause = Object.assign(new Error('other side closed'), { code: 'UND_ERR_SOCKET' });
+    throw err;
+  });
+  const status = await api.checkKey('stub-key');
+  assert.equal(status.valid, false);
+  assert.ok(status.error.includes('UND_ERR_SOCKET'), `cause missing from: ${status.error}`);
+  assert.ok(!/^fetch failed$/.test(status.error), 'the opaque message leaked through');
+});
+
 rmSync(outDir, { recursive: true, force: true });
 
 if (failures > 0) {
