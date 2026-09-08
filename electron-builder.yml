@@ -40,6 +40,10 @@ mac:
 
 linux:
   category: Graphics
+  maintainer: Kaleido Studio contributors <rlpb@users.noreply.github.com>
+  synopsis: Generazione di media AI via OpenRouter
+  desktopName: kaleido-studio.desktop
+  syncDesktopName: true
   target:
     - target: AppImage
       arch: [x64, arm64]
