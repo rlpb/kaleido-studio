@@ -13,7 +13,7 @@ npm install
 npm run dev
 ```
 
-You need Node.js 20 or newer and an OpenRouter API key to exercise generation. The checks below run without a key.
+You need Node.js 22 or newer and an OpenRouter API key to exercise generation. The checks below run without a key.
 
 ## Before you open a pull request
 
