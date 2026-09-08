@@ -72,6 +72,8 @@ interface Bridge {
     pick(kind: 'image' | 'video' | 'audio', multiple: boolean): Promise<string[]>;
     pathFor(file: File): string;
   };
+  window: { setTheme(theme: 'dark' | 'light'): Promise<boolean> };
+  platform: string;
   app: { info(): Promise<AppInfo>; openExternal(url: string): Promise<boolean> };
   mediaUrl(absolutePath: string): string;
 }

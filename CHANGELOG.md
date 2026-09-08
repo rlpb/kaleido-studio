@@ -6,6 +6,20 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.3.2] - 2026-09-08
+
+### Changed
+
+- **One bar instead of two.** The window had a system title bar sitting above
+  the app own top strip. The system bar is gone and the caption buttons are
+  drawn over the app strip instead, which stays draggable. They are still the
+  native buttons, so snapping, maximise and the system menu behave exactly as
+  the platform expects. macOS keeps its traffic lights, inset over the sidebar.
+  The caption buttons are painted by the system rather than by CSS, so the theme
+  is handed to them whenever it changes.
+- Removed the library screenshot from the README: it showed generations made
+  from Italian prompts, which reads as an accident in an English repository.
+
 ## [1.3.0] - 2026-09-08
 
 The interface speaks seven languages, and the repository moved to Apache 2.0.
@@ -136,7 +150,9 @@ First release.
   cost and disk usage.
 - Installers for Windows, macOS and Linux, built by CI.
 
-[Unreleased]: https://github.com/rlpb/kaleido-studio/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/rlpb/kaleido-studio/compare/v1.3.2...HEAD
+[1.3.2]: https://github.com/rlpb/kaleido-studio/compare/v1.3.1...v1.3.2
+[1.3.1]: https://github.com/rlpb/kaleido-studio/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/rlpb/kaleido-studio/compare/v1.2.1...v1.3.0
 [1.2.1]: https://github.com/rlpb/kaleido-studio/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/rlpb/kaleido-studio/compare/v1.1.0...v1.2.0

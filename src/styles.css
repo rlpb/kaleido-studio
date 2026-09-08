@@ -518,6 +518,8 @@ select {
   align-items: center;
   gap: 10px;
   padding: 6px 8px 18px;
+  -webkit-app-region: drag;
+  user-select: none;
 }
 
 .brand-mark {
@@ -626,6 +628,8 @@ select {
   overflow: hidden;
 }
 
+/* The window has no system title bar: this is it. The whole strip drags the
+   window, and every control inside it opts back out. */
 .topbar {
   height: 50px;
   flex: none;
@@ -635,6 +639,28 @@ select {
   gap: 12px;
   padding: 0 16px;
   background: var(--surface);
+  -webkit-app-region: drag;
+  user-select: none;
+}
+
+.topbar button,
+.topbar input,
+.topbar select,
+.topbar a,
+.topbar .chip {
+  -webkit-app-region: no-drag;
+}
+
+/* Windows and Linux draw the caption buttons over the right end of the strip,
+   so that space is reserved rather than overlapped. */
+:root[data-platform='win32'] .topbar,
+:root[data-platform='linux'] .topbar {
+  padding-right: 150px;
+}
+
+/* macOS puts the traffic lights at the top left, which is the sidebar. */
+:root[data-platform='darwin'] .sidebar {
+  padding-top: 36px;
 }
 
 .topbar h1 {
@@ -1275,6 +1301,16 @@ select {
 /* ==========================================================================
    Onboarding
    ========================================================================== */
+
+.onboarding::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 50px;
+  -webkit-app-region: drag;
+}
 
 .onboarding {
   height: 100vh;
