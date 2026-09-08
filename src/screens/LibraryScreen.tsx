@@ -74,7 +74,7 @@ export default function LibraryScreen({ push }: { push: Push }) {
               <div className="label">{t('library.files')}</div>
             </div>
             <div className="stat">
-              <div className="value mono">{formatCost(stats.totalCost)}</div>
+              <div className="value mono">{formatCost(stats.totalCost, t)}</div>
               <div className="label">{t('library.cumulativeCost')}</div>
             </div>
             <div className="stat">

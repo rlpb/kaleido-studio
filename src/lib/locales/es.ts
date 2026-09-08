@@ -53,6 +53,16 @@ const es: Dict = {
   'onboarding.step2': 'Los modelos de pago necesitan crédito en la cuenta. Los marcados como free funcionan ya.',
   'onboarding.step3': 'A partir de aquí solo eliges pantalla y modelo. Todo lo demás es automático.',
 
+  'progress.queued': "En cola",
+  'progress.sending': "Enviando la petición",
+  'progress.working': "En proceso en el proveedor",
+  'progress.workingFor': "En proceso desde hace {seconds}s",
+  'progress.downloading': "Descargando el vídeo",
+  'progress.done': "Terminado",
+  'progress.failed': "Error",
+  'progress.cancelled': "Cancelado",
+  'placeholder.language': "es, en, ja… (vacío = detección automática)",
+
   'studio.model': 'Modelo',
   'studio.loadingCatalog': 'Cargando el catálogo…',
   'studio.noModels': 'OpenRouter no ofrece ahora mismo ningún modelo para este modo.',
@@ -244,7 +254,6 @@ const es: Dict = {
   'help.duration': 'El coste crece en proporción a la duración.',
   'help.seed': 'La misma semilla y el mismo prompt dan el mismo resultado.',
   'help.speed': 'Solo la aplican los modelos que la admiten, el resto la ignora.',
-  'help.language': 'es, en, ja… (vacío = detección automática)',
   'help.word_timestamps': 'Requiere el formato verbose_json y un proveedor compatible con OpenAI.',
 };
 

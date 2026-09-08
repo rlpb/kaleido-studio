@@ -6,6 +6,39 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.4.1] - 2026-09-08
+
+An audit pass over the repository, the code and every screen. Four defects, all
+found by looking rather than by a failing check.
+
+### Fixed
+
+- **Rates lost their magnitude.** Trimming trailing zeros ate the integer part
+  too, so a transcription model billed at 00000 per million tokens displayed
+  as , and 0 as . Every price in the catalog that day happened to end in
+  a digit other than zero, which is why it stayed hidden.
+- **A zero cost printed the English word** under a translated label, because
+  the formatter hard-coded it. It takes the translator now.
+- **Job progress reached the queue in English** while the rest of the interface
+  was translated. The runner emits a key and values instead of a sentence.
+- **The language field showed an English placeholder** above its own Italian
+  help, which said the same thing. Placeholders are translated, and the
+  duplicate help is gone.
+- Italian typos where apostrophes had been dropped.
+
+### Removed
+
+- A library reader nothing read, an IPC handler the preload never exposed, and
+  three exports used only inside their own module.
+- The generated app icon is no longer committed. The build produces it, which
+  is what the README already said.
+
+### Added
+
+- ,  and  in package.json.
+- Checks for the two pricing defects above, each verified by reintroducing the
+  bug and watching the check fail.
+
 ## [1.4.0] - 2026-09-08
 
 ### Fixed
@@ -203,7 +236,8 @@ First release.
   cost and disk usage.
 - Installers for Windows, macOS and Linux, built by CI.
 
-[Unreleased]: https://github.com/rlpb/kaleido-studio/compare/v1.4.0...HEAD
+[Unreleased]: https://github.com/rlpb/kaleido-studio/compare/v1.4.1...HEAD
+[1.4.1]: https://github.com/rlpb/kaleido-studio/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/rlpb/kaleido-studio/compare/v1.3.3...v1.4.0
 [1.3.3]: https://github.com/rlpb/kaleido-studio/compare/v1.3.2...v1.3.3
 [1.3.2]: https://github.com/rlpb/kaleido-studio/compare/v1.3.1...v1.3.2

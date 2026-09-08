@@ -15,7 +15,7 @@ const it: Dict = {
   'settings.keyLimitRemaining':
     "Residuo del limite chiave",
   'settings.keyLimitHelp':
-    "Questa chiave ha un limite di spesa di {limit}. Esaurito quello le richieste vengono rifiutate anche con credito residuo sull account, e alcuni provider rifiutano l output audio sotto $0.50 di saldo disponibile. Il limite si cambia dalla pagina delle chiavi di OpenRouter.",
+    "Questa chiave ha un limite di spesa di {limit}. Esaurito quello le richieste vengono rifiutate anche con credito residuo sull'account, e alcuni provider rifiutano l'output audio sotto $0.50 di saldo disponibile. Il limite si cambia dalla pagina delle chiavi di OpenRouter.",
   'nav.spentHere': 'Speso qui',
 
   'mode.image.label': 'Immagini',
@@ -52,6 +52,16 @@ const it: Dict = {
   'onboarding.step1link': 'Creane una su openrouter.ai/keys',
   'onboarding.step2': 'I modelli a pagamento richiedono credito sull’account. Quelli marcati free partono subito.',
   'onboarding.step3': 'Da qui in poi scegli solo la schermata e il modello. Il resto è automatico.',
+
+  'progress.queued': "In coda",
+  'progress.sending': "Invio richiesta",
+  'progress.working': "In lavorazione sul provider",
+  'progress.workingFor': "In lavorazione da {seconds}s",
+  'progress.downloading': "Scarico il video",
+  'progress.done': "Completato",
+  'progress.failed': "Errore",
+  'progress.cancelled': "Annullato",
+  'placeholder.language': "it, en, ja… (vuoto = rilevamento automatico)",
 
   'studio.model': 'Modello',
   'studio.loadingCatalog': 'Carico il catalogo…',
@@ -245,7 +255,6 @@ const it: Dict = {
   'help.duration': 'Il costo cresce in proporzione alla durata.',
   'help.seed': 'Stesso seed e stesso prompt danno lo stesso risultato.',
   'help.speed': 'Applicata solo dai modelli che la supportano, altrimenti ignorata.',
-  'help.language': 'it, en, ja… (vuoto = rilevamento automatico)',
   'help.word_timestamps': 'Richiede il formato verbose_json e un provider compatibile OpenAI.',
 };
 

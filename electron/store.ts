@@ -41,7 +41,7 @@ function configPath(): string {
   return path.join(app.getPath('userData'), CONFIG_FILE);
 }
 
-export function defaultLibraryPath(): string {
+function defaultLibraryPath(): string {
   return path.join(app.getPath('userData'), 'Library');
 }
 

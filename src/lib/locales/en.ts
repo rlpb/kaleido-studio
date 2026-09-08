@@ -59,6 +59,16 @@ const en = {
   'onboarding.step2': 'Paid models need credit on the account. Models tagged free work straight away.',
   'onboarding.step3': 'From here on you only pick a screen and a model. Everything else is automatic.',
 
+  'progress.queued': "Queued",
+  'progress.sending': "Sending request",
+  'progress.working': "Working on the provider side",
+  'progress.workingFor': "Working for {seconds}s",
+  'progress.downloading': "Downloading the video",
+  'progress.done': "Done",
+  'progress.failed': "Failed",
+  'progress.cancelled': "Cancelled",
+  'placeholder.language': "en, it, ja… (empty means auto-detect)",
+
   'studio.model': 'Model',
   'studio.loadingCatalog': 'Loading the catalog…',
   'studio.noModels': 'OpenRouter currently offers no model for this mode.',
@@ -249,7 +259,6 @@ const en = {
   'help.duration': 'Cost scales directly with duration.',
   'help.seed': 'The same seed and prompt reproduce the same result.',
   'help.speed': 'Applied only by models that support it, ignored by the rest.',
-  'help.language': 'en, it, ja… (empty means auto-detect)',
   'help.word_timestamps': 'Requires the verbose_json format and an OpenAI-compatible provider.',
 };
 

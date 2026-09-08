@@ -71,7 +71,7 @@ export function MediaCard({ item, onOpen, onReuse, onUsePrompt, onToggleFavorite
         </div>
         <div className="spread faint tiny">
           <span className="ellipsis">{item.modelName}</span>
-          {item.cost !== undefined && <span className="mono">{formatCost(item.cost)}</span>}
+          {item.cost !== undefined && <span className="mono">{formatCost(item.cost, t)}</span>}
         </div>
         <div className="faint tiny">{timeOf(item.createdAt)}</div>
 
