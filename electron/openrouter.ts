@@ -95,17 +95,17 @@ function networkError(err: unknown, timeoutMs: number, elapsedMs: number): Netwo
   const hint = Object.keys(NETWORK_HINTS).find((code) => detail.includes(code));
   let explanation = hint ? NETWORK_HINTS[hint] : 'The request never reached OpenRouter.';
 
-  // A connection that dies right around the minute mark, while the model is
-  // still working and nothing is flowing over the socket, is an idle timeout on
-  // the path rather than anything either end did. VPN exit nodes and NAT
-  // gateways are the usual owners of that 60-second rule, and the symptom is
-  // specific enough to name instead of leaving as a raw error code.
+  // A connection that dies around the minute mark, while the model is still
+  // working and nothing is flowing over the socket, hit a timeout somewhere on
+  // the path. Which end owns that rule is not knowable from here, so both
+  // candidates are named rather than one of them asserted.
   if (elapsedMs >= 50_000 && elapsedMs <= 75_000) {
     explanation =
-      'The connection was cut after about a minute of silence, while the model was still working. ' +
-      'That is an idle timeout on the network path, not a problem with the request: a VPN, a NAT ' +
-      'gateway or a corporate proxy dropping sessions that send nothing for 60 seconds. Disconnect ' +
-      'the VPN, or pick a model that answers faster than that.';
+      'The connection was cut after about a minute, while the model was still working and nothing was ' +
+      'flowing over it. Requests that stay silent that long hit an idle timeout somewhere on the path. ' +
+      'Two things are worth trying, in this order: pick a model that answers faster, since a provider ' +
+      'slower than the gateway limit fails this way every time; and if you are on a VPN or behind a ' +
+      'corporate proxy, try the same run without it.';
   }
   return new NetworkError(`${explanation} Died after ${elapsed}. (${detail})`, detail);
 }
