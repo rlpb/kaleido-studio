@@ -134,6 +134,37 @@ await check('the cost signature ignores parameters that do not move the price', 
   assert.notEqual(a, pricing.costKeyFor('x/y', { resolution: '4K', seed: 1 }));
 });
 
+await check('every price the interface shows carries its currency', () => {
+  // An edit once dropped the dollar sign and the summary read as a bare "9.58",
+  // which is not a price. Cheap to assert, and invisible to the eye until it
+  // has already shipped in a screenshot.
+  const templates = {
+    'picker.perVideoSecond': '{rate} / video second',
+    'picker.perVideoSecondRange': '{min}-{max} / video second',
+    'picker.perMillionTokens': '{rate} / M tokens',
+    'picker.free': 'free',
+  };
+  const t = (key, vars = {}) =>
+    (templates[key] ?? key).replace(/\{(\w+)\}/g, (whole, name) => (name in vars ? String(vars[name]) : whole));
+
+  const currency = String.fromCharCode(36);
+  for (const mode of ['image', 'video']) {
+    for (const model of catalog.models[mode]) {
+      const summary = pricing.priceSummary(model, t);
+      if (summary === 'free') continue;
+      assert.ok(summary.includes(currency), `${model.id}: price without a currency: "${summary}"`);
+    }
+  }
+
+  const video = catalog.models.video.find((m) => Object.keys(m.price.perVideoSecond ?? {}).length > 0);
+  const resolution = Object.keys(video.price.perVideoSecond).find((k) => k !== 'default') ?? 'default';
+  const est = pricing.estimateCost(video, { resolution, duration: 5 }, 1, {});
+  assert.ok(
+    String(est.detailVars?.rate ?? '').startsWith(currency),
+    `the list-price detail lost its currency: ${JSON.stringify(est.detailVars)}`,
+  );
+});
+
 console.log('\nHTTP client');
 
 await check('setFetch is honoured, so the injected client is the one used', async () => {

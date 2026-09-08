@@ -1,19 +1,21 @@
-name: build
+name: CI
 
 on:
   push:
     branches: [main]
-    tags: ['v*']
   pull_request:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   verify:
-    name: verify
+    name: types, config and live API
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -21,13 +23,23 @@ jobs:
         with:
           node-version: 20
           cache: npm
+
       - run: npm ci
-      - run: npm run typecheck
-      # Catches an unknown electron-builder key here instead of in three
-      # packaging jobs that each fail minutes in without naming it.
-      - run: npm run check:config
-      # The self-check calls the public OpenRouter catalog routes, no key needed.
-      - run: npm run check
+
+      - name: TypeScript, strict
+        run: npm run typecheck
+
+      # electron-builder validates its config as the first step of a packaging
+      # run, so an unknown key otherwise fails all three platform jobs minutes
+      # in, with a message naming the section but never the key.
+      - name: Packaging configuration
+        run: npm run check:config
+
+      # Reads the public OpenRouter catalog routes, no API key involved. It
+      # fails when the API changes shape under the normaliser, which is the
+      # thing no local test can notice.
+      - name: Live catalog and cost estimator
+        run: npm run check
 
   package:
     name: package (${{ matrix.os }})
@@ -43,9 +55,12 @@ jobs:
         with:
           node-version: 20
           cache: npm
+
       - run: npm ci
       - run: npm run build
 
+      # Builds the real installers on every push, so a packaging break surfaces
+      # here rather than on the day a release is cut.
       - name: Build installers
         run: npx electron-builder --publish never
         env:
@@ -59,19 +74,5 @@ jobs:
             release/*.dmg
             release/*.AppImage
             release/*.deb
-          if-no-files-found: ignore
+          if-no-files-found: error
           retention-days: 14
-
-  release:
-    name: release
-    if: startsWith(github.ref, 'refs/tags/v')
-    needs: package
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          path: artifacts
-      - uses: softprops/action-gh-release@v2
-        with:
-          files: artifacts/**/*
-          generate_release_notes: true
