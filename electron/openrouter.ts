@@ -454,6 +454,7 @@ function transcribeParams(): ParamSpec[] {
       label: label('language'),
       kind: 'text',
       placeholder: 'en, it, ja… (empty means auto-detect)',
+      // The help said the same thing right underneath; the placeholder is enough.
     },
     {
       key: 'response_format',

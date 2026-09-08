@@ -215,7 +215,7 @@ export default function MediaViewer({ items, index, onIndex, onClose, push }: Pr
 
       <div className="viewer-foot" onPointerDown={(e) => e.stopPropagation()}>
         <span className="faint tiny">{timeOf(item.createdAt)}</span>
-        {item.cost !== undefined && <span className="mono tiny faint">{formatCost(item.cost)}</span>}
+        {item.cost !== undefined && <span className="mono tiny faint">{formatCost(item.cost, t)}</span>}
         {item.prompt && (
           <button
             className="btn btn-ghost btn-sm"

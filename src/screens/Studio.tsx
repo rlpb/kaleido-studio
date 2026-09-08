@@ -320,7 +320,7 @@ export default function Studio({
                 <span className="cost-label">{t('studio.estimatedCost')}</span>
                 <span className={`chip ${BASIS_TONE[estimate.basis] ?? ''}`}>{t(`basis.${estimate.basis}`)}</span>
               </div>
-              <div className="cost-amount mono">{formatCost(estimate.total)}</div>
+              <div className="cost-amount mono">{formatCost(estimate.total, t)}</div>
               <div className="help">{t(estimate.detailKey, estimate.detailVars)}</div>
             </div>
 
@@ -366,7 +366,7 @@ export default function Studio({
                   <div className="job-body">
                     <div className="spread">
                       <strong className="small">{job.modelName}</strong>
-                      <span className="faint mono tiny">{job.progress}</span>
+                      <span className="faint mono tiny">{t(job.progressKey, job.progressVars)}</span>
                     </div>
                     <div className="faint tiny ellipsis">{job.prompt || t('studio.noPrompt')}</div>
                     <div className="bar">

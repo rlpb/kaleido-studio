@@ -2,7 +2,7 @@ import { app, BrowserWindow, dialog, ipcMain, Menu, net, protocol, shell } from 
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import type { Catalog, JobRequest, LibraryItem, ModeId, Preset, Settings } from '../src/lib/types';
+import type { Catalog, JobRequest, LibraryItem, Preset, Settings } from '../src/lib/types';
 import { fetchCatalog, checkKey, getCredits, setFetch } from './openrouter';
 import * as store from './store';
 import * as library from './library';
@@ -273,7 +273,6 @@ function registerIpc(): void {
     return result.canceled ? [] : result.filePaths;
   });
 
-  handle('files:mode', (mode: ModeId) => mode);
   handle('window:theme', (theme) => {
     // Windows and Linux paint the caption buttons themselves, so a theme change
     // has to be handed to them or the strip stays the previous colour.

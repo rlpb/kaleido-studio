@@ -24,7 +24,7 @@ const EXTENSIONS: Record<string, string> = {
   'text/plain': 'txt',
 };
 
-export function extensionFor(mediaType: string, kind: MediaKind): string {
+function extensionFor(mediaType: string, kind: MediaKind): string {
   const clean = mediaType.split(';')[0].trim().toLowerCase();
   if (EXTENSIONS[clean]) return EXTENSIONS[clean];
   const guess = clean.split('/')[1];
@@ -154,10 +154,6 @@ export function deleteItem(id: string, deleteFile = true): boolean {
   }
   writeIndex(items.filter((i) => i.id !== id));
   return true;
-}
-
-export function getItem(id: string): LibraryItem | null {
-  return readIndex().find((i) => i.id === id) ?? null;
 }
 
 export function stats(): { count: number; byKind: Record<string, number>; totalCost: number; bytes: number } {

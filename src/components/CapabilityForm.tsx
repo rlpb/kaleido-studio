@@ -24,6 +24,10 @@ export default function CapabilityForm({ params, values, onChange }: Props) {
     const translated = t(`param.${key}` as keyof Dict);
     return translated === `param.${key}` ? fallback : translated;
   };
+  const placeholderFor = (key: string, fallback?: string) => {
+    const translated = t(`placeholder.${key}` as keyof Dict);
+    return translated === `placeholder.${key}` ? fallback : translated;
+  };
   const helpFor = (key: string, fallback?: string) => {
     const translated = t(`help.${key}` as keyof Dict);
     return translated === `help.${key}` ? fallback : translated;
@@ -112,7 +116,7 @@ export default function CapabilityForm({ params, values, onChange }: Props) {
               <input
                 id={`p-${spec.key}`}
                 type="text"
-                placeholder={spec.placeholder}
+                placeholder={placeholderFor(spec.key, spec.placeholder)}
                 value={current === undefined ? '' : String(current)}
                 onChange={(e) => onChange(spec.key, e.target.value === '' ? undefined : e.target.value)}
               />

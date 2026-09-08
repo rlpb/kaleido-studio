@@ -113,7 +113,17 @@ export interface Job {
   params: Record<string, string | number | boolean>;
   inputs: string[];
   status: JobStatus;
-  progress: string;
+  /** A dictionary key, so the queue reads in the chosen language. */
+  progressKey:
+    | 'progress.queued'
+    | 'progress.sending'
+    | 'progress.working'
+    | 'progress.workingFor'
+    | 'progress.downloading'
+    | 'progress.done'
+    | 'progress.failed'
+    | 'progress.cancelled';
+  progressVars?: Record<string, string | number>;
   createdAt: number;
   finishedAt?: number;
   cost?: number;

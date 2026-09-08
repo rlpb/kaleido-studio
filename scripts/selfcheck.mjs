@@ -188,6 +188,42 @@ await check('nothing is called free unless OpenRouter says so', () => {
   }
 });
 
+await check('a rate keeps its magnitude', () => {
+  // Trimming trailing zeros used to eat the integer part as well, so a model
+  // billed at $100000 per million tokens displayed as $1. Whole numbers ending
+  // in zero are the cases that hid it, since every price in the catalog that
+  // day happened to end in something else.
+  const t = (key, vars = {}) =>
+    ({ 'picker.perMillionTokens': '{rate} / M tokens' })[key].replace(/\{(\w+)\}/g, (w, n) =>
+      n in vars ? String(vars[n]) : w,
+    );
+  const model = (perImageToken) => ({
+    price: { perImageToken, perVideoSecond: {}, free: false, unpublished: false },
+  });
+
+  const cases = [
+    [0.1, '$100000 / M tokens'],
+    [0.00005, '$50 / M tokens'],
+    [0.00002, '$20 / M tokens'],
+    [0.00000359, '$3.59 / M tokens'],
+    [0.0000038, '$3.8 / M tokens'],
+  ];
+  for (const [rate, expected] of cases) {
+    const actual = pricing.priceSummary(model(rate), t);
+    assert.equal(actual, expected, `rate ${rate} rendered as "${actual}"`);
+  }
+});
+
+await check('a zero cost reads in the chosen language', () => {
+  const t = (key) => (key === 'cost.free' ? 'gratis' : key);
+  assert.equal(pricing.formatCost(0, t), 'gratis');
+  // Without a translator it must not fall back to an English word, which would
+  // land untranslated in an interface that is otherwise fully localised.
+  assert.equal(pricing.formatCost(0), '0');
+  assert.equal(pricing.formatCost(0.5), '$0.5');
+  assert.equal(pricing.formatCost(1.5), '$1.50');
+});
+
 console.log('\nHTTP client');
 
 await check('setFetch is honoured, so the injected client is the one used', async () => {

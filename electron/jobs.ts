@@ -203,7 +203,7 @@ export class JobRunner {
     if (!job || job.status === 'done' || job.status === 'error') return;
     this.cancelled.add(id);
     this.queue = this.queue.filter((q) => q !== id);
-    this.emit({ ...job, status: 'cancelled', progress: 'Cancelled', finishedAt: Date.now() });
+    this.emit({ ...job, status: 'cancelled', progressKey: 'progress.cancelled', finishedAt: Date.now() });
   }
 
   /**
@@ -238,7 +238,7 @@ export class JobRunner {
         params: req.params,
         inputs: req.inputs,
         status: 'queued',
-        progress: 'Queued',
+        progressKey: 'progress.queued',
         createdAt: Date.now() + i,
         outputs: [],
       };
@@ -270,11 +270,11 @@ export class JobRunner {
     if (!job) return;
     const key = getKey();
     if (!key) {
-      this.emit({ ...job, status: 'error', error: 'No API key configured', finishedAt: Date.now() });
+      this.emit({ ...job, status: 'error', progressKey: 'progress.failed', error: 'No API key configured', finishedAt: Date.now() });
       return;
     }
 
-    this.emit({ ...job, status: 'running', progress: 'Sending request' });
+    this.emit({ ...job, status: 'running', progressKey: 'progress.sending' });
     try {
       const req: JobRequest = {
         mode: job.mode,
@@ -293,7 +293,7 @@ export class JobRunner {
       this.emit({
         ...this.jobs.get(id)!,
         status: 'done',
-        progress: 'Done',
+        progressKey: 'progress.done',
         finishedAt: Date.now(),
         cost: cost > 0 ? cost : undefined,
         outputs: items.map((item) => ({
@@ -308,16 +308,16 @@ export class JobRunner {
       this.emit({
         ...this.jobs.get(id)!,
         status: 'error',
-        progress: 'Failed',
+        progressKey: 'progress.failed',
         finishedAt: Date.now(),
         error: err instanceof Error ? err.message : String(err),
       });
     }
   }
 
-  private progress(id: string, text: string): void {
+  private progress(id: string, key: Job['progressKey'], vars?: Job['progressVars']): void {
     const job = this.jobs.get(id);
-    if (job) this.emit({ ...job, progress: text });
+    if (job) this.emit({ ...job, progressKey: key, progressVars: vars });
   }
 
   private store(job: Job, kind: MediaKind, mediaType: string, bytes: Buffer, cost?: number, text?: string): LibraryItem {
@@ -350,7 +350,7 @@ export class JobRunner {
 
     if (endpoint === 'videos') {
       const handle = await api.createVideo(key, buildVideoBody(req));
-      this.progress(job.id, 'Working on the provider side');
+      this.progress(job.id, 'progress.working');
       const started = Date.now();
       let poll = await api.pollVideo(key, handle.id);
 
@@ -360,14 +360,14 @@ export class JobRunner {
           throw new Error('Timed out: the provider did not finish the video within 20 minutes');
         }
         const elapsed = Math.round((Date.now() - started) / 1000);
-        this.progress(job.id, `Working for ${elapsed}s`);
+        this.progress(job.id, 'progress.workingFor', { seconds: elapsed });
         await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
         poll = await api.pollVideo(key, handle.id);
       }
 
       if (poll.status === 'failed') throw new Error(poll.error ?? 'Video generation failed');
 
-      this.progress(job.id, 'Downloading the video');
+      this.progress(job.id, 'progress.downloading');
       const count = Math.max(1, poll.urls.length);
       const items: LibraryItem[] = [];
       for (let i = 0; i < count; i += 1) {

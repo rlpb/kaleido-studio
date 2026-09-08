@@ -53,6 +53,16 @@ const ru: Dict = {
   'onboarding.step2': 'Платным моделям нужен баланс на счёте. Модели с пометкой free работают сразу.',
   'onboarding.step3': 'Дальше вы выбираете только экран и модель. Остальное происходит само.',
 
+  'progress.queued': "В очереди",
+  'progress.sending': "Отправка запроса",
+  'progress.working': "Выполняется у поставщика",
+  'progress.workingFor': "Выполняется {seconds}с",
+  'progress.downloading': "Загрузка видео",
+  'progress.done': "Готово",
+  'progress.failed': "Ошибка",
+  'progress.cancelled': "Отменено",
+  'placeholder.language': "ru, en, ja… (пусто = определить автоматически)",
+
   'studio.model': 'Модель',
   'studio.loadingCatalog': 'Загрузка каталога…',
   'studio.noModels': 'Сейчас у OpenRouter нет моделей для этого режима.',
@@ -244,7 +254,6 @@ const ru: Dict = {
   'help.duration': 'Стоимость растёт пропорционально длительности.',
   'help.seed': 'Тот же seed и тот же запрос дают тот же результат.',
   'help.speed': 'Применяют только модели с её поддержкой, остальные игнорируют.',
-  'help.language': 'ru, en, ja… (пусто = определить автоматически)',
   'help.word_timestamps': 'Требует формат verbose_json и поставщика, совместимого с OpenAI.',
 };
 

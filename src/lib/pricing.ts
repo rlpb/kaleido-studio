@@ -31,19 +31,28 @@ export interface Estimate {
   detailVars?: Record<string, string | number>;
 }
 
-/** Trims a rate to the digits that carry meaning, without scientific notation. */
+/**
+ * Trims a rate to the digits that carry meaning, without scientific notation.
+ *
+ * Only zeros after a decimal point are noise. Stripping them from the integer
+ * part turns 100000 into 1 and 50 into 5, which is how a transcription model
+ * billed at $100000 per million tokens came to display as $1.
+ */
 function significant(value: number, digits = 3): string {
   if (value === 0) return '0';
   const magnitude = Math.floor(Math.log10(Math.abs(value)));
   const decimals = Math.min(10, Math.max(0, digits - 1 - magnitude));
-  return value.toFixed(decimals).replace(/\.?0+$/, '');
+  return value
+    .toFixed(decimals)
+    .replace(/(\.\d*?)0+$/, '$1')
+    .replace(/\.$/, '');
 }
 
 /**
  * Per-token rates run to fifteen decimal places, which is unreadable. Every
  * provider quotes them per million tokens, so that is how they are shown.
  */
-export function formatRate(perUnit: number, unit: string): string {
+function formatRate(perUnit: number, unit: string): string {
   if (unit === 'token') return `$${significant(perUnit * 1_000_000)} / M tokens`;
   return `$${significant(perUnit)} / ${unit}`;
 }
@@ -131,11 +140,17 @@ export function estimateCost(
     : { total: null, basis: 'unknown', detailKey: 'cost.unknown' };
 }
 
-export function formatCost(value: number | null | undefined): string {
+/** Pass the translator to have a zero read as "free" in the chosen language. */
+export function formatCost(value: number | null | undefined, t?: Translate): string {
   if (value === null || value === undefined) return '—';
-  if (value === 0) return 'free';
-  if (value < 0.001) return `<$0.001`;
-  if (value < 1) return `$${value.toFixed(4).replace(/0+$/, '').replace(/\.$/, '')}`;
+  if (value === 0) return t ? t('cost.free') : '0';
+  if (value < 0.001) return '<$0.001';
+  if (value < 1) {
+    return `$${value
+      .toFixed(4)
+      .replace(/(\.\d*?)0+$/, '$1')
+      .replace(/\.$/, '')}`;
+  }
   return `$${value.toFixed(2)}`;
 }
 
@@ -144,7 +159,7 @@ export function formatMoney(value: number | null | undefined): string {
   if (value === null || value === undefined) return '—';
   // Small amounts need more places, but never as trailing zeros: $0.1200 reads
   // like a precision the number does not have.
-  const text = value > 0 && value < 1 ? value.toFixed(4).replace(/0+$/, '') : value.toFixed(2);
+  const text = value > 0 && value < 1 ? value.toFixed(4).replace(/(\.\d*?)0+$/, '$1') : value.toFixed(2);
   return `$${text.replace(/\.$/, '')}`;
 }
 
