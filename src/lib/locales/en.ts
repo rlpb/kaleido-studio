@@ -15,6 +15,14 @@ const en = {
   'nav.library': 'Library',
   'nav.settings': 'Settings',
   'nav.credit': 'Credit',
+  'nav.creditOnKey':
+    "Key balance",
+  'nav.creditKeyLimited':
+    "This key has its own spend limit, and it is lower than the account credit.",
+  'settings.keyLimitRemaining':
+    "Left on the key limit",
+  'settings.keyLimitHelp':
+    "This key carries a spend limit of {limit}. Requests are refused once it runs out, even with credit left on the account, and some providers refuse audio output below $0.50 of spendable balance. The limit is changed on the OpenRouter keys page.",
   'nav.spentHere': 'Spent here',
 
   'mode.image.label': 'Images',
@@ -101,6 +109,10 @@ const en = {
   'cost.rate':
     'Billed at {rate}. The token count depends on the result, so the exact cost appears when the run finishes.',
   'cost.unknown': 'The exact cost appears when the run finishes.',
+  'picker.priceUnpublished':
+    "price not published",
+  'cost.unpublished':
+    "OpenRouter publishes no price for this model, which does not mean it is free: some models with no listed price still bill. The real cost appears when the run finishes, and the next estimate uses it.",
   'cost.free': 'free',
 
   'picker.title': 'Choose a model',

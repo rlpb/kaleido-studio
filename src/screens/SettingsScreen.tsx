@@ -63,6 +63,12 @@ export default function SettingsScreen({ settings, keyState, setSettings, onKeyC
               <div className="value mono">{formatMoney(keyState.usage ?? 0)}</div>
               <div className="label">{t('settings.usageOnKey')}</div>
             </div>
+            {keyState.limit != null && (
+              <div className="stat">
+                <div className="value mono">{formatMoney(keyState.limitRemaining ?? 0)}</div>
+                <div className="label">{t('settings.keyLimitRemaining')}</div>
+              </div>
+            )}
             <div className="stat">
               <div className="value mono">{formatMoney(settings.spendTotal)}</div>
               <div className="label">{t('settings.spentFromApp')}</div>
@@ -79,6 +85,10 @@ export default function SettingsScreen({ settings, keyState, setSettings, onKeyC
             {keyState.label && <span className="chip mono">{keyState.label}</span>}
             {keyState.isFreeTier && <span className="chip chip-warn">{t('settings.freeTier')}</span>}
           </div>
+
+          {keyState.limit != null && (
+            <div className="help gap-top">{t('settings.keyLimitHelp', { limit: formatMoney(keyState.limit) })}</div>
+          )}
 
           {!keyState.encrypted && (
             <div className="help gap-top">{t('settings.noKeychain', { path: info?.userData ?? '' })}</div>

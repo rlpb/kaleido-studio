@@ -8,6 +8,14 @@ const pt: Dict = {
   'nav.library': 'Biblioteca',
   'nav.settings': 'Configurações',
   'nav.credit': 'Crédito',
+  'nav.creditOnKey':
+    "Saldo da chave",
+  'nav.creditKeyLimited':
+    "Esta chave tem um limite de gasto próprio, menor que o crédito da conta.",
+  'settings.keyLimitRemaining':
+    "Restante do limite da chave",
+  'settings.keyLimitHelp':
+    "Esta chave tem um limite de gasto de {limit}. Esgotado ele, as requisições são recusadas mesmo com crédito na conta, e alguns fornecedores recusam saída de áudio abaixo de $0.50 de saldo disponível. O limite se altera na página de chaves do OpenRouter.",
   'nav.spentHere': 'Gasto aqui',
 
   'mode.image.label': 'Imagens',
@@ -95,6 +103,10 @@ const pt: Dict = {
   'cost.rate':
     'Cobrado a {rate}. A contagem de tokens depende do resultado, então o custo exato aparece ao terminar.',
   'cost.unknown': 'O custo exato aparece quando a execução termina.',
+  'picker.priceUnpublished':
+    "preço não publicado",
+  'cost.unpublished':
+    "O OpenRouter não publica preço para este modelo, o que não significa que seja gratuito: alguns modelos sem preço de tabela cobram assim mesmo. O custo real aparece ao terminar e a próxima estimativa vai usá-lo.",
   'cost.free': 'grátis',
 
   'picker.title': 'Escolha um modelo',

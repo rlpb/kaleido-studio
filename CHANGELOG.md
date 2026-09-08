@@ -6,6 +6,23 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-09-08
+
+### Fixed
+
+- **The balance shown ignored the spend limit on the key.** Two ceilings apply
+  at once, the credit on the account and the limit set on the key, and the app
+  showed only the first. A key with 25 cents left read as forty dollars, right
+  up until a provider refused the request for lack of balance. The smaller of
+  the two is shown now, labelled as the key balance when that is the one
+  biting, with both figures broken out in Settings.
+- **A model with no published price was labelled free.** All-zero pricing is not
+  a price of zero: google/lyria-3-pro-preview lists {"prompt":"0",
+  "completion":"0"} and bills real money per generation. Free is now claimed only
+  for the ":free" model ids, which is the one thing that supports it; everything
+  else at zero reads as price not published, and says plainly that it may still
+  bill. The self-check refuses any other model marked free.
+
 ## [1.3.3] - 2026-09-08
 
 ### Fixed
@@ -186,7 +203,8 @@ First release.
   cost and disk usage.
 - Installers for Windows, macOS and Linux, built by CI.
 
-[Unreleased]: https://github.com/rlpb/kaleido-studio/compare/v1.3.3...HEAD
+[Unreleased]: https://github.com/rlpb/kaleido-studio/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/rlpb/kaleido-studio/compare/v1.3.3...v1.4.0
 [1.3.3]: https://github.com/rlpb/kaleido-studio/compare/v1.3.2...v1.3.3
 [1.3.2]: https://github.com/rlpb/kaleido-studio/compare/v1.3.1...v1.3.2
 [1.3.1]: https://github.com/rlpb/kaleido-studio/compare/v1.3.0...v1.3.1

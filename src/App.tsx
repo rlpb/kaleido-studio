@@ -165,9 +165,16 @@ export default function App() {
   }
 
   const activeJobs = jobs.filter((j) => j.status === 'queued' || j.status === 'running').length;
-  const balance = keyState.credits
-    ? Math.max(0, keyState.credits.total - keyState.credits.used)
-    : (keyState.limitRemaining ?? null);
+  // Two ceilings apply at once: the credit on the account, and the spend limit
+  // set on the key itself. A provider refusing a request for lack of balance
+  // looks at what is actually spendable, so the smaller one is the real figure.
+  // Showing the account credit alone made a nearly exhausted key look flush.
+  const ceilings = [
+    keyState.credits ? Math.max(0, keyState.credits.total - keyState.credits.used) : null,
+    keyState.limitRemaining ?? null,
+  ].filter((v): v is number => v !== null);
+  const balance = ceilings.length ? Math.min(...ceilings) : null;
+  const keyLimitBinds = keyState.limitRemaining != null && balance === keyState.limitRemaining;
 
   return (
     <I18nContext.Provider value={i18n}>
@@ -220,8 +227,8 @@ export default function App() {
             </button>
 
             <div className="balance">
-              <div className="spread">
-                <span className="faint">{t('nav.credit')}</span>
+              <div className="spread" title={keyLimitBinds ? t('nav.creditKeyLimited') : undefined}>
+                <span className="faint">{keyLimitBinds ? t('nav.creditOnKey') : t('nav.credit')}</span>
                 <span className="mono">{formatMoney(balance)}</span>
               </div>
               <div className="spread">

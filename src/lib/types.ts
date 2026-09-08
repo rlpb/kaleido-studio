@@ -50,7 +50,15 @@ export interface PriceModel {
   perAudioInputToken?: number;
   /** USD per output audio token. */
   perAudioOutputToken?: number;
+  /** True only for OpenRouter's explicit free tier, the ":free" model ids. */
   free: boolean;
+  /**
+   * The catalog reports every price field as zero without the model being free.
+   * Observed on google/lyria-3-pro-preview, which lists {"prompt":"0",
+   * "completion":"0"} and then bills real money per generation. An unpublished
+   * price is not a price of zero, and the interface must not claim it is.
+   */
+  unpublished: boolean;
 }
 
 export interface ModelInfo {

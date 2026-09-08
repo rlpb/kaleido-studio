@@ -61,7 +61,7 @@ export function priceSummary(model: ModelInfo, t: Translate): string {
   }
   const perToken = model.price.perImageToken ?? model.price.perAudioOutputToken ?? model.price.perInputToken;
   if (perToken) return t('picker.perMillionTokens', { rate: `$${significant(perToken * 1_000_000)}` });
-  return t('picker.free');
+  return model.price.free ? t('picker.free') : t('picker.priceUnpublished');
 }
 
 /** Lower is cheaper. Used to sort the model list by price. */
@@ -114,6 +114,10 @@ export function estimateCost(
 
   if (model.price.free) {
     return { total: 0, basis: 'free', detailKey: 'cost.noListPrice' };
+  }
+
+  if (model.price.unpublished) {
+    return { total: null, basis: 'unknown', detailKey: 'cost.unpublished' };
   }
 
   const rate = model.price.perImageToken ?? model.price.perAudioOutputToken ?? model.price.perOutputToken;

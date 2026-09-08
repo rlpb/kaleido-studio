@@ -290,12 +290,13 @@ const NOT_A_FORM_FIELD = new Set([
   'callback_url',
 ]);
 
-function priceFromModelEntry(pricing: Record<string, string> | undefined): PriceModel {
+function priceFromModelEntry(pricing: Record<string, string> | undefined, modelId = ''): PriceModel {
   const num = (v: string | undefined) => {
     const n = Number(v);
     return Number.isFinite(n) && n > 0 ? n : undefined;
   };
   const price: PriceModel = {
+    unpublished: false,
     perInputToken: num(pricing?.prompt),
     perOutputToken: num(pricing?.completion),
     perImageToken: num(pricing?.image_output),
@@ -303,7 +304,14 @@ function priceFromModelEntry(pricing: Record<string, string> | undefined): Price
     perAudioOutputToken: num(pricing?.audio_output),
     free: false,
   };
-  price.free = !price.perInputToken && !price.perOutputToken && !price.perImageToken && !price.perAudioOutputToken;
+  // Free is a claim about billing, and the only thing that supports it is the
+  // ":free" suffix OpenRouter puts on its free tier. Everything at zero without
+  // that suffix is a price the catalog did not publish, which is a different
+  // statement and, as lyria-3-pro-preview shows, sometimes a paid one.
+  const allZero =
+    !price.perInputToken && !price.perOutputToken && !price.perImageToken && !price.perAudioOutputToken;
+  price.free = modelId.endsWith(':free');
+  price.unpublished = allZero && !price.free;
   return price;
 }
 
@@ -409,7 +417,8 @@ function videoPrice(skus: Record<string, string> | undefined): PriceModel {
     if (sku === 'duration_seconds') perVideoSecond.default = n;
     else if (sku.startsWith('duration_seconds_')) perVideoSecond[sku.slice('duration_seconds_'.length)] = n;
   }
-  return { perVideoSecond, free: Object.keys(perVideoSecond).length === 0 };
+  const known = Object.keys(perVideoSecond).length > 0;
+  return { perVideoSecond, free: false, unpublished: !known };
 }
 
 function speechParams(entry: any): ParamSpec[] {
@@ -513,7 +522,7 @@ export async function fetchCatalog(key: string | null): Promise<Catalog> {
     return {
       ...baseModel({ ...entry, architecture: entry.architecture ?? priced?.architecture }),
       params,
-      price: priceFromModelEntry(priced?.pricing),
+      price: priceFromModelEntry(priced?.pricing, entry.id),
       maxReferences,
       supportsFrameImages: false,
       isUpscaler: false,
@@ -536,7 +545,7 @@ export async function fetchCatalog(key: string | null): Promise<Catalog> {
     entries.map((entry: any) => ({
       ...baseModel(entry),
       params: params(entry),
-      price: priceFromModelEntry(entry.pricing),
+      price: priceFromModelEntry(entry.pricing, entry.id),
       maxReferences: 0,
       supportsFrameImages: false,
       isUpscaler: false,
