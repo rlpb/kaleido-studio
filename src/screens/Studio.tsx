@@ -2,11 +2,12 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { bridge } from '../lib/api';
 import type { Catalog, Job, ModelInfo, ModeId, Preset, Settings } from '../lib/types';
 import { MODE_BY_ID, PROMPT_REQUIRED } from '../lib/modes';
-import { estimateCost, formatCost } from '../lib/pricing';
-import ModelPicker, { priceSummary } from '../components/ModelPicker';
+import { estimateCost, formatCost, priceSummary } from '../lib/pricing';
+import ModelPicker from '../components/ModelPicker';
 import CapabilityForm from '../components/CapabilityForm';
 import InputAssets from '../components/InputAssets';
 import { MediaCard, MediaViewer, type MediaRef } from '../components/MediaCard';
+import Icon from '../components/Icon';
 
 type Value = string | number | boolean;
 type Push = (text: string, tone?: 'info' | 'ok' | 'error') => void;
@@ -32,6 +33,13 @@ function defaultsFor(model: ModelInfo | undefined): Record<string, Value> {
   }
   return values;
 }
+
+const BASIS_TONE: Record<string, string> = {
+  'list price': 'chip-ok',
+  measured: 'chip-accent',
+  free: 'chip-ok',
+  unknown: '',
+};
 
 export default function Studio({
   mode,
@@ -102,6 +110,7 @@ export default function Studio({
   );
 
   const promptNeeded = PROMPT_REQUIRED.includes(mode);
+  const promptUseful = promptNeeded || mode === 'video-from-image' || mode === 'video-upscale';
   const missingInputs = def.needsInput ? inputs.length < def.needsInput.min : false;
   const canRun = Boolean(model) && !(promptNeeded && !prompt.trim()) && !missingInputs;
 
@@ -110,7 +119,7 @@ export default function Studio({
     try {
       await bridge.jobs.enqueue({ mode, modelId: model.id, prompt, params, inputs, batch }, model.name);
       void bridge.prompts.list().then(setHistory);
-      push(batch > 1 ? `${batch} generazioni in coda` : 'Generazione avviata', 'ok');
+      push(batch > 1 ? `${batch} runs queued` : 'Generation started', 'ok');
     } catch (err) {
       push(err instanceof Error ? err.message : String(err), 'error');
     }
@@ -130,6 +139,7 @@ export default function Studio({
 
   const modeJobs = useMemo(() => jobs.filter((j) => j.mode === mode), [jobs, mode]);
   const pending = modeJobs.filter((j) => j.status === 'queued' || j.status === 'running');
+  const failed = modeJobs.filter((j) => j.status === 'error');
 
   const results: MediaRef[] = useMemo(
     () =>
@@ -153,7 +163,7 @@ export default function Studio({
 
   const savePreset = async () => {
     if (!model) return;
-    const name = window.prompt('Nome del preset', `${def.label} · ${model.name}`);
+    const name = window.prompt('Preset name', `${def.label} · ${model.name}`);
     if (!name) return;
     setPresets(
       await bridge.presets.save({
@@ -166,14 +176,7 @@ export default function Studio({
         createdAt: Date.now(),
       }),
     );
-    push('Preset salvato', 'ok');
-  };
-
-  const applyPreset = (preset: Preset) => {
-    const target = models.find((m) => m.id === preset.modelId);
-    if (target) setModelId(target.id);
-    setPrompt(preset.prompt);
-    setParams(preset.params);
+    push('Preset saved', 'ok');
   };
 
   const modePresets = presets.filter((p) => p.mode === mode);
@@ -182,56 +185,63 @@ export default function Studio({
     <>
       <div className="topbar">
         <h1>{def.label}</h1>
-        <span className="faint">{def.hint}</span>
+        <span className="faint ellipsis">{def.hint}</span>
         <div className="spacer" />
         {activeJobs > 0 && (
           <span className="chip chip-accent">
-            <span className="spin" style={{ width: 10, height: 10 }} /> {activeJobs} in corso
+            <span className="spin sm" /> {activeJobs} running
           </span>
         )}
-        <button className="btn btn-ghost btn-sm" onClick={() => void reloadCatalog(true)} title="Ricarica il catalogo da OpenRouter">
-          ⟳ Modelli
+        <button className="btn btn-ghost btn-sm" onClick={() => void reloadCatalog(true)} title="Reload the catalog from OpenRouter">
+          <Icon name="refresh" />
+          Models
         </button>
       </div>
 
       <div className="studio">
         <div className="panel">
+          <div className="panel-scroll">
           {catalogError && (
-            <div className="chip chip-danger" style={{ whiteSpace: 'normal' }}>
-              Catalogo non caricato: {catalogError}
+            <div className="banner banner-danger">
+              <Icon name="alert" />
+              <span>Catalog not loaded: {catalogError}</span>
             </div>
           )}
 
           <div className="field">
-            <label>Modello</label>
-            {!catalog && <div className="row"><span className="spin" /> <span className="faint">Carico il catalogo…</span></div>}
+            <label>Model</label>
+            {!catalog && (
+              <div className="row">
+                <span className="spin" /> <span className="faint">Loading the catalog…</span>
+              </div>
+            )}
             {catalog && models.length === 0 && (
-              <div className="faint">Nessun modello disponibile su OpenRouter per questa modalità.</div>
+              <div className="faint">OpenRouter currently offers no model for this mode.</div>
             )}
             {model && (
               <button className="model-button" onClick={() => setPickerOpen(true)}>
-                <div style={{ minWidth: 0, flex: 1 }}>
+                <div className="model-button-text">
                   <div className="name">{model.name}</div>
                   <div className="sub mono">{priceSummary(model)}</div>
                 </div>
-                <span className="faint">▾</span>
+                <Icon name="chevronDown" />
               </button>
             )}
           </div>
 
-          {promptNeeded || mode === 'video-from-image' || mode === 'video-upscale' ? (
+          {promptUseful && (
             <div className="field">
               <label htmlFor="prompt">
-                {mode === 'speech' ? 'Testo da leggere' : 'Prompt'}
-                {promptNeeded && <span style={{ color: 'var(--danger)' }}> *</span>}
+                {mode === 'speech' ? 'Text to speak' : 'Prompt'}
+                {promptNeeded && <span className="required"> *</span>}
               </label>
               <textarea
                 id="prompt"
                 value={prompt}
                 placeholder={
                   mode === 'speech'
-                    ? 'Scrivi qui il testo che vuoi sentire pronunciato…'
-                    : 'Descrivi cosa vuoi ottenere. Più sei specifico su soggetto, luce e inquadratura, più il risultato è controllabile.'
+                    ? 'Type the text you want spoken aloud…'
+                    : 'Describe what you want. The more specific about subject, light and framing, the more control you get.'
                 }
                 onChange={(e) => setPrompt(e.target.value)}
               />
@@ -242,7 +252,7 @@ export default function Studio({
                     if (e.target.value) setPrompt(e.target.value);
                   }}
                 >
-                  <option value="">Riprendi un prompt recente…</option>
+                  <option value="">Reuse a recent prompt…</option>
                   {history.slice(0, 30).map((entry, i) => (
                     <option key={i} value={entry}>
                       {entry.slice(0, 90)}
@@ -251,7 +261,7 @@ export default function Studio({
                 </select>
               )}
             </div>
-          ) : null}
+          )}
 
           {def.needsInput && (
             <InputAssets
@@ -266,21 +276,25 @@ export default function Studio({
           )}
 
           <div>
-            <div className="section-title">Parametri del modello</div>
+            <div className="section-title">Model parameters</div>
             <CapabilityForm params={model?.params ?? []} values={params} onChange={setParam} />
           </div>
 
           {modePresets.length > 0 && (
             <div className="field">
-              <label>Preset</label>
+              <label>Presets</label>
               <select
                 value=""
                 onChange={(e) => {
                   const preset = modePresets.find((p) => p.id === e.target.value);
-                  if (preset) applyPreset(preset);
+                  if (!preset) return;
+                  const target = models.find((m) => m.id === preset.modelId);
+                  if (target) setModelId(target.id);
+                  setPrompt(preset.prompt);
+                  setParams(preset.params);
                 }}
               >
-                <option value="">Applica un preset…</option>
+                <option value="">Apply a preset…</option>
                 {modePresets.map((preset) => (
                   <option key={preset.id} value={preset.id}>
                     {preset.name}
@@ -290,23 +304,21 @@ export default function Studio({
             </div>
           )}
 
+          </div>
+
           <div className="run-bar">
             <div className="cost-box">
               <div className="spread">
-                <span className="faint" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  Costo stimato
-                </span>
-                <span className={`chip ${estimate.basis === 'listino' ? 'chip-ok' : estimate.basis === 'misurato' ? 'chip-accent' : ''}`}>
-                  {estimate.basis}
-                </span>
+                <span className="cost-label">Estimated cost</span>
+                <span className={`chip ${BASIS_TONE[estimate.basis] ?? ''}`}>{estimate.basis}</span>
               </div>
               <div className="cost-amount mono">{formatCost(estimate.total)}</div>
               <div className="help">{estimate.detail}</div>
             </div>
 
             <div className="row">
-              <div className="field" style={{ width: 92 }}>
-                <label htmlFor="batch">Quantità</label>
+              <div className="field batch">
+                <label htmlFor="batch">Count</label>
                 <input
                   id="batch"
                   type="number"
@@ -316,19 +328,21 @@ export default function Studio({
                   onChange={(e) => setBatch(Math.min(8, Math.max(1, Number(e.target.value) || 1)))}
                 />
               </div>
-              <button className="btn btn-primary" style={{ flex: 1, marginTop: 18 }} onClick={() => void run()} disabled={!canRun}>
-                Genera <span className="kbd" style={{ color: 'inherit', opacity: 0.8 }}>Ctrl ↵</span>
+              <button className="btn btn-primary btn-run" onClick={() => void run()} disabled={!canRun}>
+                <Icon name="sparkle" />
+                Generate
+                <span className="kbd inverse">Ctrl ↵</span>
               </button>
             </div>
 
             <div className="row">
               <button className="btn btn-ghost btn-sm" onClick={() => void savePreset()} disabled={!model}>
-                Salva preset
+                Save preset
               </button>
               <div className="spacer" />
               {!canRun && (
-                <span className="faint" style={{ fontSize: 11 }}>
-                  {promptNeeded && !prompt.trim() ? 'Manca il prompt' : missingInputs ? 'Mancano i file di input' : ''}
+                <span className="faint tiny">
+                  {promptNeeded && !prompt.trim() ? 'Prompt missing' : missingInputs ? 'Input files missing' : ''}
                 </span>
               )}
             </div>
@@ -337,59 +351,60 @@ export default function Studio({
 
         <div className="canvas">
           {pending.length > 0 && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div className="stack">
               {pending.map((job) => (
                 <div className="job" key={job.id}>
                   <div className="spin" />
-                  <div style={{ flex: 1, minWidth: 0 }}>
+                  <div className="job-body">
                     <div className="spread">
-                      <strong style={{ fontSize: 12.5 }}>{job.modelName}</strong>
-                      <span className="faint mono" style={{ fontSize: 11 }}>
-                        {job.progress}
-                      </span>
+                      <strong className="small">{job.modelName}</strong>
+                      <span className="faint mono tiny">{job.progress}</span>
                     </div>
-                    <div className="faint" style={{ fontSize: 11, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {job.prompt || 'senza prompt'}
-                    </div>
+                    <div className="faint tiny ellipsis">{job.prompt || 'no prompt'}</div>
                     <div className="bar">
                       <span />
                     </div>
                   </div>
                   <button className="btn btn-ghost btn-sm" onClick={() => void bridge.jobs.cancel(job.id)}>
-                    Annulla
+                    Cancel
                   </button>
                 </div>
               ))}
             </div>
           )}
 
-          {modeJobs.some((j) => j.status === 'error') && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {modeJobs
-                .filter((j) => j.status === 'error')
-                .slice(0, 3)
-                .map((job) => (
-                  <div className="job" key={job.id} style={{ borderColor: 'var(--danger)' }}>
-                    <span style={{ color: 'var(--danger)' }}>✕</span>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <strong style={{ fontSize: 12.5 }}>{job.modelName}</strong>
-                      <div className="faint" style={{ fontSize: 11.5, whiteSpace: 'normal' }}>
-                        {job.error}
-                      </div>
-                    </div>
+          {failed.length > 0 && (
+            <div className="stack">
+              {failed.slice(0, 3).map((job) => (
+                <div className="job job-error" key={job.id}>
+                  <Icon name="alert" />
+                  <div className="job-body">
+                    <strong className="small">{job.modelName}</strong>
+                    <div className="faint small wrap-text">{job.error}</div>
                   </div>
-                ))}
-              <button className="btn btn-ghost btn-sm" style={{ alignSelf: 'flex-start' }} onClick={() => void bridge.jobs.clear()}>
-                Pulisci gli errori
+                  <button
+                    className="btn btn-ghost btn-icon"
+                    title="Copy the error"
+                    onClick={() => {
+                      void navigator.clipboard.writeText(job.error ?? '');
+                      push('Error copied', 'ok');
+                    }}
+                  >
+                    <Icon name="copy" />
+                  </button>
+                </div>
+              ))}
+              <button className="btn btn-ghost btn-sm self-start" onClick={() => void bridge.jobs.clear()}>
+                Clear errors
               </button>
             </div>
           )}
 
           {results.length === 0 && pending.length === 0 ? (
             <div className="empty">
-              <div className="glyph">◍</div>
-              <div>Ancora niente in questa sessione</div>
-              <div style={{ fontSize: 12 }}>I risultati passati restano nella Libreria.</div>
+              <Icon name={def.outputKind === 'video' ? 'video' : def.outputKind === 'audio' ? 'music' : 'image'} size={30} />
+              <div>Nothing generated in this session yet</div>
+              <div className="tiny">Earlier results stay in the Library.</div>
             </div>
           ) : (
             <div className="grid">
@@ -402,7 +417,7 @@ export default function Studio({
                   onUsePrompt={setPrompt}
                   onReuse={(ref) => {
                     if (def.needsInput) setInputs([ref.path]);
-                    else push('Questa modalità non accetta file in ingresso', 'info');
+                    else push('This mode takes no input files', 'info');
                   }}
                 />
               ))}

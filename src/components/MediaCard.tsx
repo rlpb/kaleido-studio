@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { bridge } from '../lib/api';
 import type { MediaKind } from '../lib/types';
 import { formatCost } from '../lib/pricing';
+import Icon from './Icon';
 
 export interface MediaRef {
   id: string;
@@ -16,6 +17,8 @@ export interface MediaRef {
   favorite?: boolean;
 }
 
+type Push = (text: string, tone?: 'info' | 'ok' | 'error') => void;
+
 interface CardProps {
   item: MediaRef;
   onOpen: (item: MediaRef) => void;
@@ -23,10 +26,10 @@ interface CardProps {
   onUsePrompt?: (prompt: string) => void;
   onToggleFavorite?: (item: MediaRef) => void;
   onDelete?: (item: MediaRef) => void;
-  push: (text: string, tone?: 'info' | 'ok' | 'error') => void;
+  push: Push;
 }
 
-const timeOf = (ms: number) => new Date(ms).toLocaleString('it-IT', { dateStyle: 'short', timeStyle: 'short' });
+const timeOf = (ms: number) => new Date(ms).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
 
 export function MediaCard({ item, onOpen, onReuse, onUsePrompt, onToggleFavorite, onDelete, push }: CardProps) {
   const url = bridge.mediaUrl(item.path);
@@ -34,78 +37,96 @@ export function MediaCard({ item, onOpen, onReuse, onUsePrompt, onToggleFavorite
   return (
     <div className="media-card">
       <div className="media-frame" onClick={() => onOpen(item)}>
-        {item.kind === 'image' && <img src={url} alt={item.prompt || 'immagine generata'} loading="lazy" />}
-        {item.kind === 'video' && <video src={url} muted loop playsInline onMouseEnter={(e) => void e.currentTarget.play()} onMouseLeave={(e) => e.currentTarget.pause()} />}
+        {item.kind === 'image' && <img src={url} alt={item.prompt || 'generated image'} loading="lazy" />}
+        {item.kind === 'video' && (
+          <>
+            <video
+              src={url}
+              muted
+              loop
+              playsInline
+              onMouseEnter={(e) => void e.currentTarget.play().catch(() => undefined)}
+              onMouseLeave={(e) => e.currentTarget.pause()}
+            />
+            <span className="frame-badge">
+              <Icon name="play" size={12} filled />
+            </span>
+          </>
+        )}
         {item.kind === 'audio' && (
-          <div style={{ display: 'grid', gap: 10, placeItems: 'center', width: '100%', padding: 14 }}>
-            <div style={{ fontSize: 26 }}>♪</div>
-            <audio src={url} controls style={{ width: '100%' }} onClick={(e) => e.stopPropagation()} />
+          <div className="audio-frame" onClick={(e) => e.stopPropagation()}>
+            <Icon name="music" size={26} />
+            <audio src={url} controls />
           </div>
         )}
-        {item.kind === 'text' && <div className="text-preview">{(item.text ?? '').slice(0, 400) || 'Trascrizione vuota'}</div>}
+        {item.kind === 'text' && (
+          <div className="text-preview">{(item.text ?? '').slice(0, 420) || 'Empty transcription'}</div>
+        )}
       </div>
 
       <div className="media-meta">
         <div className="prompt" title={item.prompt}>
-          {item.prompt || <span className="faint">senza prompt</span>}
+          {item.prompt || <span className="faint">no prompt</span>}
         </div>
-        <div className="spread faint" style={{ fontSize: 11 }}>
-          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.modelName}</span>
-          <span className="mono">{item.cost !== undefined ? formatCost(item.cost) : ''}</span>
+        <div className="spread faint tiny">
+          <span className="ellipsis">{item.modelName}</span>
+          {item.cost !== undefined && <span className="mono">{formatCost(item.cost)}</span>}
         </div>
-        <div className="faint" style={{ fontSize: 10.5 }}>
-          {timeOf(item.createdAt)}
-        </div>
+        <div className="faint tiny">{timeOf(item.createdAt)}</div>
 
         <div className="media-actions">
           {onToggleFavorite && (
             <button
-              className={`btn btn-ghost btn-sm${item.favorite ? ' star on' : ''}`}
-              title="Preferito"
+              className={`btn btn-ghost btn-icon${item.favorite ? ' is-favourite' : ''}`}
+              title="Favourite"
               onClick={() => onToggleFavorite(item)}
             >
-              {item.favorite ? '★' : '☆'}
+              <Icon name="star" filled={item.favorite} />
             </button>
           )}
           <button
-            className="btn btn-ghost btn-sm"
-            title="Salva una copia altrove"
+            className="btn btn-ghost btn-icon"
+            title="Save a copy elsewhere"
             onClick={async () => {
               const saved = await bridge.library.exportCopy(item.path);
-              if (saved) push('Copia salvata', 'ok');
+              if (saved) push('Copy saved', 'ok');
             }}
           >
-            ⭳
+            <Icon name="download" />
           </button>
-          <button className="btn btn-ghost btn-sm" title="Mostra nella cartella" onClick={() => void bridge.library.reveal(item.path)}>
-            ⌸
+          <button
+            className="btn btn-ghost btn-icon"
+            title="Show in folder"
+            onClick={() => void bridge.library.reveal(item.path)}
+          >
+            <Icon name="folder" />
           </button>
           {onReuse && (item.kind === 'image' || item.kind === 'video') && (
-            <button className="btn btn-ghost btn-sm" title="Usa come input" onClick={() => onReuse(item)}>
-              ↻
+            <button className="btn btn-ghost btn-icon" title="Use as input" onClick={() => onReuse(item)}>
+              <Icon name="reuse" />
             </button>
           )}
           {onUsePrompt && item.prompt && (
-            <button className="btn btn-ghost btn-sm" title="Riusa il prompt" onClick={() => onUsePrompt(item.prompt)}>
-              ⎘
+            <button className="btn btn-ghost btn-icon" title="Reuse the prompt" onClick={() => onUsePrompt(item.prompt)}>
+              <Icon name="copy" />
             </button>
           )}
           {item.kind === 'text' && (
             <button
-              className="btn btn-ghost btn-sm"
-              title="Copia il testo"
+              className="btn btn-ghost btn-icon"
+              title="Copy the text"
               onClick={() => {
                 void navigator.clipboard.writeText(item.text ?? '');
-                push('Testo copiato', 'ok');
+                push('Text copied', 'ok');
               }}
             >
-              ✎
+              <Icon name="copy" />
             </button>
           )}
           <div className="spacer" />
           {onDelete && (
-            <button className="btn btn-danger btn-sm" title="Elimina" onClick={() => onDelete(item)}>
-              ✕
+            <button className="btn btn-ghost btn-icon danger" title="Delete" onClick={() => onDelete(item)}>
+              <Icon name="trash" />
             </button>
           )}
         </div>
@@ -117,7 +138,7 @@ export function MediaCard({ item, onOpen, onReuse, onUsePrompt, onToggleFavorite
 interface ViewerProps {
   item: MediaRef;
   onClose: () => void;
-  push: (text: string, tone?: 'info' | 'ok' | 'error') => void;
+  push: Push;
 }
 
 export function MediaViewer({ item, onClose, push }: ViewerProps) {
@@ -135,30 +156,30 @@ export function MediaViewer({ item, onClose, push }: ViewerProps) {
     <div className="viewer">
       <div className="viewer-head">
         <strong>{item.modelName}</strong>
-        <span className="faint" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {item.prompt}
-        </span>
+        <span className="faint ellipsis">{item.prompt}</span>
         <div className="spacer" />
         <button
           className="btn btn-sm"
           onClick={async () => {
             const saved = await bridge.library.exportCopy(item.path);
-            if (saved) push('Copia salvata', 'ok');
+            if (saved) push('Copy saved', 'ok');
           }}
         >
-          Salva copia
+          <Icon name="download" />
+          Save a copy
         </button>
         <button className="btn btn-sm" onClick={() => void bridge.library.open(item.path)}>
-          Apri fuori
+          <Icon name="external" />
+          Open externally
         </button>
         <button className="btn btn-sm" onClick={onClose}>
-          Chiudi <span className="kbd">Esc</span>
+          Close <span className="kbd">Esc</span>
         </button>
       </div>
       <div className="viewer-body">
         {item.kind === 'image' && <img src={url} alt={item.prompt} />}
         {item.kind === 'video' && <video src={url} controls autoPlay loop />}
-        {item.kind === 'audio' && <audio src={url} controls autoPlay style={{ width: 'min(620px, 90vw)' }} />}
+        {item.kind === 'audio' && <audio src={url} controls autoPlay className="viewer-audio" />}
         {item.kind === 'text' && <pre>{item.text}</pre>}
       </div>
     </div>

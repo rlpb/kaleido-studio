@@ -41,7 +41,7 @@ mac:
 linux:
   category: Graphics
   maintainer: Kaleido Studio contributors <rlpb@users.noreply.github.com>
-  synopsis: Generazione di media AI via OpenRouter
+  synopsis: AI media generation through OpenRouter
   syncDesktopName: true
   target:
     - target: AppImage
@@ -52,6 +52,6 @@ linux:
   desktop:
     entry:
       Name: Kaleido Studio
-      Comment: Generazione di immagini, video, voce e trascrizioni su OpenRouter
+      Comment: Generate images, video, speech and transcriptions on OpenRouter
 
 publish: null

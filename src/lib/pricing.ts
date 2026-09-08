@@ -15,15 +15,56 @@ export function costKeyFor(modelId: string, params: Params): string {
   return [modelId, ...parts].join('|');
 }
 
+export type EstimateBasis = 'list price' | 'measured' | 'free' | 'unknown';
+
 export interface Estimate {
   /** USD for the whole batch, or null when no honest figure can be produced. */
   total: number | null;
   /** Where the number comes from, so the UI never presents a guess as a quote. */
-  basis: 'listino' | 'misurato' | 'gratis' | 'sconosciuto';
+  basis: EstimateBasis;
   detail: string;
 }
 
-const money = (n: number): string => (n >= 0.01 ? `$${n.toFixed(3)}` : `$${n.toFixed(5)}`);
+/** Trims a rate to the digits that carry meaning, without scientific notation. */
+function significant(value: number, digits = 3): string {
+  if (value === 0) return '0';
+  const magnitude = Math.floor(Math.log10(Math.abs(value)));
+  const decimals = Math.min(10, Math.max(0, digits - 1 - magnitude));
+  return value.toFixed(decimals).replace(/\.?0+$/, '');
+}
+
+/**
+ * Per-token rates run to fifteen decimal places, which is unreadable. Every
+ * provider quotes them per million tokens, so that is how they are shown.
+ */
+export function formatRate(perUnit: number, unit: string): string {
+  if (unit === 'token') return `$${significant(perUnit * 1_000_000)} / M tokens`;
+  return `$${significant(perUnit)} / ${unit}`;
+}
+
+/** One line describing how a model bills, whatever scheme it uses. */
+export function priceSummary(model: ModelInfo): string {
+  const seconds = model.price.perVideoSecond;
+  if (seconds && Object.keys(seconds).length) {
+    const rates = Object.values(seconds);
+    const min = Math.min(...rates);
+    const max = Math.max(...rates);
+    return min === max
+      ? `$${significant(min)} / video second`
+      : `$${significant(min)}–${significant(max)} / video second`;
+  }
+  if (model.price.perImageToken) return formatRate(model.price.perImageToken, 'token');
+  if (model.price.perAudioOutputToken) return formatRate(model.price.perAudioOutputToken, 'token');
+  if (model.price.perInputToken) return formatRate(model.price.perInputToken, 'token');
+  return 'free';
+}
+
+/** Lower is cheaper. Used to sort the model list by price. */
+export function cheapness(model: ModelInfo): number {
+  const seconds = model.price.perVideoSecond;
+  if (seconds && Object.keys(seconds).length) return Math.min(...Object.values(seconds));
+  return model.price.perImageToken ?? model.price.perAudioOutputToken ?? model.price.perInputToken ?? 0;
+}
 
 /**
  * Video is billed per second of output, which the catalog states exactly, so its
@@ -37,7 +78,7 @@ export function estimateCost(
   batch: number,
   observedCosts: Record<string, number>,
 ): Estimate {
-  if (!model) return { total: null, basis: 'sconosciuto', detail: 'Nessun modello selezionato' };
+  if (!model) return { total: null, basis: 'unknown', detail: 'No model selected' };
 
   const runs = Math.max(1, batch);
   const perSecond = model.price.perVideoSecond;
@@ -47,11 +88,10 @@ export function estimateCost(
     const rate = perSecond[resolution] ?? perSecond.default ?? Object.values(perSecond)[0];
     const duration = Number(params.duration ?? 0);
     if (rate && duration > 0) {
-      const total = rate * duration * runs;
       return {
-        total,
-        basis: 'listino',
-        detail: `${money(rate)}/s × ${duration}s${runs > 1 ? ` × ${runs}` : ''}`,
+        total: rate * duration * runs,
+        basis: 'list price',
+        detail: `$${significant(rate)}/s × ${duration}s${runs > 1 ? ` × ${runs}` : ''}`,
       };
     }
   }
@@ -60,29 +100,37 @@ export function estimateCost(
   if (typeof observed === 'number') {
     return {
       total: observed * runs,
-      basis: 'misurato',
-      detail: `Costo reale dell'ultima generazione identica${runs > 1 ? ` × ${runs}` : ''}`,
+      basis: 'measured',
+      detail: `What the last identical run actually cost${runs > 1 ? `, × ${runs}` : ''}`,
     };
   }
 
   if (model.price.free) {
-    return { total: 0, basis: 'gratis', detail: 'Modello senza costo a listino' };
+    return { total: 0, basis: 'free', detail: 'No list price on this model' };
   }
 
   const rate = model.price.perImageToken ?? model.price.perAudioOutputToken ?? model.price.perOutputToken;
   return {
     total: null,
-    basis: 'sconosciuto',
+    basis: 'unknown',
     detail: rate
-      ? `Tariffa ${money(rate)} per token di output. Il numero di token dipende dal risultato, quindi il costo esatto compare a fine generazione.`
-      : 'Il costo esatto compare a fine generazione.',
+      ? `Billed at ${formatRate(rate, 'token')}. The token count depends on the result, so the exact cost appears when the run finishes.`
+      : 'The exact cost appears when the run finishes.',
   };
 }
 
 export function formatCost(value: number | null | undefined): string {
   if (value === null || value === undefined) return '—';
-  if (value === 0) return 'gratis';
-  return money(value);
+  if (value === 0) return 'free';
+  if (value < 0.001) return `<$0.001`;
+  if (value < 1) return `$${value.toFixed(4).replace(/0+$/, '').replace(/\.$/, '')}`;
+  return `$${value.toFixed(2)}`;
+}
+
+/** Like formatCost, but a zero balance reads as money, not as a free model. */
+export function formatMoney(value: number | null | undefined): string {
+  if (value === null || value === undefined) return '—';
+  return `$${value.toFixed(value < 1 && value > 0 ? 4 : 2)}`;
 }
 
 export function formatBytes(bytes: number): string {

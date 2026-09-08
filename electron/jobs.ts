@@ -191,7 +191,7 @@ export class JobRunner {
     if (!job || job.status === 'done' || job.status === 'error') return;
     this.cancelled.add(id);
     this.queue = this.queue.filter((q) => q !== id);
-    this.emit({ ...job, status: 'cancelled', progress: 'Annullato', finishedAt: Date.now() });
+    this.emit({ ...job, status: 'cancelled', progress: 'Cancelled', finishedAt: Date.now() });
   }
 
   /** Enqueues one job per requested batch item and starts as many as allowed. */
@@ -207,7 +207,7 @@ export class JobRunner {
         params: req.params,
         inputs: req.inputs,
         status: 'queued',
-        progress: 'In coda',
+        progress: 'Queued',
         createdAt: Date.now() + i,
         outputs: [],
       };
@@ -239,11 +239,11 @@ export class JobRunner {
     if (!job) return;
     const key = getKey();
     if (!key) {
-      this.emit({ ...job, status: 'error', error: 'Nessuna chiave API configurata', finishedAt: Date.now() });
+      this.emit({ ...job, status: 'error', error: 'No API key configured', finishedAt: Date.now() });
       return;
     }
 
-    this.emit({ ...job, status: 'running', progress: 'Invio richiesta' });
+    this.emit({ ...job, status: 'running', progress: 'Sending request' });
     try {
       const req: JobRequest = {
         mode: job.mode,
@@ -262,7 +262,7 @@ export class JobRunner {
       this.emit({
         ...this.jobs.get(id)!,
         status: 'done',
-        progress: 'Completato',
+        progress: 'Done',
         finishedAt: Date.now(),
         cost: cost > 0 ? cost : undefined,
         outputs: items.map((item) => ({
@@ -277,7 +277,7 @@ export class JobRunner {
       this.emit({
         ...this.jobs.get(id)!,
         status: 'error',
-        progress: 'Errore',
+        progress: 'Failed',
         finishedAt: Date.now(),
         error: err instanceof Error ? err.message : String(err),
       });
@@ -310,7 +310,7 @@ export class JobRunner {
 
     if (endpoint === 'images') {
       const result = await api.createImages(key, buildImageBody(req));
-      if (!result.images.length) throw new Error('Il modello non ha restituito immagini');
+      if (!result.images.length) throw new Error('The model returned no images');
       // A multi-image response bills once, so the cost rides on the first file.
       return result.images.map((img, i) =>
         this.store(job, 'image', img.mediaType, Buffer.from(img.base64, 'base64'), i === 0 ? result.cost : undefined),
@@ -319,24 +319,24 @@ export class JobRunner {
 
     if (endpoint === 'videos') {
       const handle = await api.createVideo(key, buildVideoBody(req));
-      this.progress(job.id, 'In lavorazione sul provider');
+      this.progress(job.id, 'Working on the provider side');
       const started = Date.now();
       let poll = await api.pollVideo(key, handle.id);
 
       while (poll.status === 'pending' || poll.status === 'in_progress') {
         if (this.cancelled.has(job.id)) return [];
         if (Date.now() - started > POLL_TIMEOUT_MS) {
-          throw new Error('Tempo scaduto: il provider non ha completato il video entro 20 minuti');
+          throw new Error('Timed out: the provider did not finish the video within 20 minutes');
         }
         const elapsed = Math.round((Date.now() - started) / 1000);
-        this.progress(job.id, `In lavorazione da ${elapsed}s`);
+        this.progress(job.id, `Working for ${elapsed}s`);
         await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
         poll = await api.pollVideo(key, handle.id);
       }
 
-      if (poll.status === 'failed') throw new Error(poll.error ?? 'Generazione del video fallita');
+      if (poll.status === 'failed') throw new Error(poll.error ?? 'Video generation failed');
 
-      this.progress(job.id, 'Scarico il video');
+      this.progress(job.id, 'Downloading the video');
       const count = Math.max(1, poll.urls.length);
       const items: LibraryItem[] = [];
       for (let i = 0; i < count; i += 1) {
@@ -361,7 +361,7 @@ export class JobRunner {
     }
 
     const result = await api.createChatAudio(key, buildChatAudioBody(req));
-    if (!result.audio) throw new Error(result.text || 'Il modello non ha restituito audio');
+    if (!result.audio) throw new Error(result.text || 'The model returned no audio')
     return [
       this.store(
         job,

@@ -1,0 +1,21 @@
+name: Feature request
+description: Suggest something the app should do
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What are you trying to do that the app makes hard or impossible?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you would like instead
+  - type: checkboxes
+    id: openrouter
+    attributes:
+      label: Prerequisite
+      options:
+        - label: OpenRouter exposes an API for this, or I am not sure and would like it checked

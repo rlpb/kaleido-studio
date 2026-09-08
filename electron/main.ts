@@ -50,6 +50,8 @@ function createWindow(): void {
     minHeight: 680,
     show: false,
     backgroundColor: '#0b0d12',
+    // The menu stays reachable with Alt but does not frame the app by default.
+    autoHideMenuBar: true,
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
@@ -91,7 +93,7 @@ function buildMenu(): void {
       label: 'File',
       submenu: [
         {
-          label: 'Apri cartella libreria',
+          label: 'Open library folder',
           click: () => void shell.openPath(store.getSettings().libraryPath),
         },
         { type: 'separator' },
@@ -105,11 +107,11 @@ function buildMenu(): void {
       role: 'help',
       submenu: [
         {
-          label: 'Documentazione OpenRouter',
+          label: 'OpenRouter documentation',
           click: () => void shell.openExternal('https://openrouter.ai/docs'),
         },
         {
-          label: 'Repository del progetto',
+          label: 'Project repository',
           click: () => void shell.openExternal('https://github.com/rlpb/kaleido-studio'),
         },
       ],
@@ -171,7 +173,7 @@ function registerIpc(): void {
 
   handle('settings:pickLibrary', async () => {
     const result = await dialog.showOpenDialog({
-      title: 'Scegli la cartella della libreria',
+      title: 'Choose the library folder',
       properties: ['openDirectory', 'createDirectory'],
       defaultPath: store.getSettings().libraryPath,
     });
@@ -203,7 +205,7 @@ function registerIpc(): void {
 
   handle('library:export', async (filePath: string) => {
     const result = await dialog.showSaveDialog({
-      title: 'Salva una copia',
+      title: 'Save a copy',
       defaultPath: path.basename(filePath),
     });
     if (result.canceled || !result.filePath) return null;
@@ -225,7 +227,7 @@ function registerIpc(): void {
       audio: [{ name: 'Audio', extensions: ['mp3', 'wav', 'm4a', 'ogg', 'flac', 'aac', 'webm'] }],
     }[kind];
     const result = await dialog.showOpenDialog({
-      title: 'Scegli i file di input',
+      title: 'Choose the input files',
       properties: multiple ? ['openFile', 'multiSelections'] : ['openFile'],
       filters,
     });

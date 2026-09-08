@@ -1,5 +1,7 @@
 import { useMemo, useState } from 'react';
 import type { ModelInfo } from '../lib/types';
+import { cheapness, priceSummary } from '../lib/pricing';
+import Icon from './Icon';
 
 interface Props {
   models: ModelInfo[];
@@ -10,32 +12,11 @@ interface Props {
   onClose: () => void;
 }
 
-type Sort = 'recenti' | 'prezzo' | 'nome';
-
-/** A one-line price summary, using whatever billing scheme the model has. */
-export function priceSummary(model: ModelInfo): string {
-  const seconds = model.price.perVideoSecond;
-  if (seconds && Object.keys(seconds).length) {
-    const rates = Object.values(seconds);
-    const min = Math.min(...rates);
-    const max = Math.max(...rates);
-    return min === max ? `$${min}/s di video` : `$${min}–${max}/s di video`;
-  }
-  if (model.price.perImageToken) return `$${model.price.perImageToken} / token immagine`;
-  if (model.price.perAudioOutputToken) return `$${model.price.perAudioOutputToken} / token audio`;
-  if (model.price.perInputToken) return `$${model.price.perInputToken} / token input`;
-  return 'gratis';
-}
-
-function cheapness(model: ModelInfo): number {
-  const seconds = model.price.perVideoSecond;
-  if (seconds && Object.keys(seconds).length) return Math.min(...Object.values(seconds));
-  return model.price.perImageToken ?? model.price.perAudioOutputToken ?? model.price.perInputToken ?? 0;
-}
+type Sort = 'newest' | 'cheapest' | 'name';
 
 export default function ModelPicker({ models, selectedId, favorites, onSelect, onToggleFavorite, onClose }: Props) {
   const [query, setQuery] = useState('');
-  const [sort, setSort] = useState<Sort>('recenti');
+  const [sort, setSort] = useState<Sort>('newest');
   const [onlyFavorites, setOnlyFavorites] = useState(false);
 
   const visible = useMemo(() => {
@@ -50,8 +31,8 @@ export default function ModelPicker({ models, selectedId, favorites, onSelect, o
       );
     });
     const sorted = [...filtered];
-    if (sort === 'nome') sorted.sort((a, b) => a.name.localeCompare(b.name));
-    else if (sort === 'prezzo') sorted.sort((a, b) => cheapness(a) - cheapness(b));
+    if (sort === 'name') sorted.sort((a, b) => a.name.localeCompare(b.name));
+    else if (sort === 'cheapest') sorted.sort((a, b) => cheapness(a) - cheapness(b));
     else sorted.sort((a, b) => b.created - a.created);
     // Favourites float to the top whatever the sort is.
     return sorted.sort((a, b) => Number(favorites.includes(b.id)) - Number(favorites.includes(a.id)));
@@ -62,27 +43,35 @@ export default function ModelPicker({ models, selectedId, favorites, onSelect, o
       <div className="modal" onMouseDown={(e) => e.stopPropagation()}>
         <div className="modal-head">
           <div className="spread">
-            <strong>Scegli il modello</strong>
-            <span className="faint">
-              {visible.length} di {models.length}
-            </span>
+            <strong>Choose a model</strong>
+            <div className="row">
+              <span className="faint">
+                {visible.length} of {models.length}
+              </span>
+              <button className="btn btn-ghost btn-icon" onClick={onClose} title="Close">
+                <Icon name="close" />
+              </button>
+            </div>
           </div>
           <div className="toolbar">
-            <input
-              type="search"
-              placeholder="Cerca per nome, autore o descrizione…"
-              value={query}
-              autoFocus
-              onChange={(e) => setQuery(e.target.value)}
-            />
+            <div className="input-with-icon grow">
+              <Icon name="search" />
+              <input
+                type="search"
+                placeholder="Search by name, vendor or description…"
+                value={query}
+                autoFocus
+                onChange={(e) => setQuery(e.target.value)}
+              />
+            </div>
             <select value={sort} onChange={(e) => setSort(e.target.value as Sort)}>
-              <option value="recenti">Più recenti</option>
-              <option value="prezzo">Più economici</option>
-              <option value="nome">Nome</option>
+              <option value="newest">Newest first</option>
+              <option value="cheapest">Cheapest first</option>
+              <option value="name">Name</option>
             </select>
             <label className="switch">
               <input type="checkbox" checked={onlyFavorites} onChange={(e) => setOnlyFavorites(e.target.checked)} />
-              <span className="muted">Solo preferiti</span>
+              <span className="muted">Favourites only</span>
             </label>
           </div>
         </div>
@@ -90,35 +79,34 @@ export default function ModelPicker({ models, selectedId, favorites, onSelect, o
         <div className="modal-body">
           {visible.length === 0 && (
             <div className="empty">
-              <div className="glyph">◌</div>
-              <div>Nessun modello corrisponde alla ricerca</div>
+              <Icon name="search" size={28} />
+              <div>No model matches that search</div>
             </div>
           )}
           {visible.map((model) => (
             <div key={model.id} className={`model-row${model.id === selectedId ? ' selected' : ''}`}>
               <button
-                style={{ textAlign: 'left', minWidth: 0 }}
+                className="model-row-main"
                 onClick={() => {
                   onSelect(model);
                   onClose();
                 }}
               >
-                <div className="row" style={{ gap: 7 }}>
+                <div className="row wrap">
                   <strong>{model.name}</strong>
                   <span className="chip">{model.vendor}</span>
+                  {model.price.free && <span className="chip chip-ok">free</span>}
                 </div>
-                <div className="mono faint" style={{ fontSize: 11 }}>
-                  {model.id}
-                </div>
+                <div className="mono faint model-id">{model.id}</div>
                 {model.description && <div className="desc">{model.description}</div>}
               </button>
-              <span className="chip mono">{priceSummary(model)}</span>
+              <span className="chip mono nowrap">{priceSummary(model)}</span>
               <button
-                className={`star${favorites.includes(model.id) ? ' on' : ''}`}
-                title={favorites.includes(model.id) ? 'Togli dai preferiti' : 'Aggiungi ai preferiti'}
+                className={`btn btn-ghost btn-icon${favorites.includes(model.id) ? ' is-favourite' : ''}`}
+                title={favorites.includes(model.id) ? 'Remove from favourites' : 'Add to favourites'}
                 onClick={() => onToggleFavorite(model.id)}
               >
-                ★
+                <Icon name="star" filled={favorites.includes(model.id)} />
               </button>
             </div>
           ))}

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { bridge } from '../lib/api';
 import type { MediaKind } from '../lib/types';
+import Icon from './Icon';
 
 interface Props {
   kind: MediaKind;
@@ -50,21 +51,24 @@ export default function InputAssets({ kind, label, min, max, files, onChange, fr
   return (
     <div className="field">
       <label>
-        {label} {min > 0 && <span style={{ color: 'var(--danger)' }}>*</span>}
+        {label} {min > 0 && <span className="required">*</span>}
       </label>
 
       {files.length > 0 && (
         <div className="thumbs">
           {files.map((path, index) => (
-            <div className="thumb" key={path}>
+            <div className="thumb" key={path} title={basename(path)}>
               {kind === 'image' && <img src={bridge.mediaUrl(path)} alt={basename(path)} />}
               {kind === 'video' && <video src={bridge.mediaUrl(path)} muted />}
-              {kind === 'audio' && <div className="file-glyph">♪</div>}
-              <button className="remove" title="Rimuovi" onClick={() => onChange(files.filter((f) => f !== path))}>
-                ×
+              {kind === 'audio' && (
+                <div className="file-glyph">
+                  <Icon name="music" size={22} />
+                </div>
+              )}
+              <button className="remove" title="Remove" onClick={() => onChange(files.filter((f) => f !== path))}>
+                <Icon name="close" size={11} />
               </button>
-              {frameMode && <div className="badge">{index === 0 ? 'primo' : 'ultimo'}</div>}
-              {!frameMode && <div className="badge">{basename(path).slice(0, 9)}</div>}
+              <div className="badge">{frameMode ? (index === 0 ? 'first' : 'last') : basename(path).slice(0, 10)}</div>
             </div>
           ))}
         </div>
@@ -81,15 +85,17 @@ export default function InputAssets({ kind, label, min, max, files, onChange, fr
           onDragLeave={() => setOver(false)}
           onDrop={onDrop}
         >
-          Trascina qui {max > 1 ? 'i file' : 'il file'} oppure clicca per sceglier{max > 1 ? 'li' : 'lo'}
-          {frameMode && files.length === 1 && ' (il secondo diventa il fotogramma finale)'}
+          <Icon name="plus" size={18} />
+          <span>
+            Drop {max > 1 ? 'files' : 'a file'} here, or click to browse
+            {frameMode && files.length === 1 ? ' (the second becomes the closing frame)' : ''}
+          </span>
         </div>
       )}
 
-      {files.length >= min && files.length > 0 && (
+      {files.length > 0 && (
         <div className="help">
-          {files.length} file selezionat{files.length === 1 ? 'o' : 'i'}
-          {max > files.length ? `, fino a ${max}` : ''}
+          {files.length} file{files.length === 1 ? '' : 's'} selected{max > files.length ? `, up to ${max}` : ''}
         </div>
       )}
     </div>

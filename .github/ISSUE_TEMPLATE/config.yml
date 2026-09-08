@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: OpenRouter documentation
+    url: https://openrouter.ai/docs
+    about: Questions about models, pricing or API behaviour belong upstream.

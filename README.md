@@ -1,36 +1,36 @@
 # Kaleido Studio
 
-Applicazione desktop per generare media con OpenRouter. Immagini, modifica di immagini, video da testo, video da immagine, upscaling video, sintesi vocale, musica e trascrizioni, in un'unica interfaccia.
+A desktop app for generating media through OpenRouter. Images, image editing, text-to-video, image-to-video, video upscaling, speech synthesis, music and transcription, in one interface.
 
-Incolli la chiave API al primo avvio. Da lì scegli una schermata e un modello, e generi.
+Paste your API key on first launch. From there you pick a screen and a model, and generate.
 
 [![build](https://github.com/rlpb/kaleido-studio/actions/workflows/build.yml/badge.svg)](https://github.com/rlpb/kaleido-studio/actions/workflows/build.yml)
-![Electron](https://img.shields.io/badge/Electron-desktop-47848F)
-![Licenza](https://img.shields.io/badge/licenza-MIT-blue)
-![Piattaforme](https://img.shields.io/badge/Windows%20%7C%20macOS%20%7C%20Linux-supportate-lightgrey)
+[![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+![platforms](https://img.shields.io/badge/Windows%20%7C%20macOS%20%7C%20Linux-supported-lightgrey)
+![electron](https://img.shields.io/badge/Electron-desktop-47848F)
 
 ---
 
-## Cosa fa
+## What it does
 
-Otto modalità, ognuna appoggiata a un endpoint OpenRouter:
+Eight modes, each backed by an OpenRouter endpoint:
 
-| Modalità | Cosa produce | Endpoint | Modelli disponibili |
+| Mode | Output | Endpoint | Models |
 |---|---|---|---|
-| Immagini | Immagine da prompt | `POST /api/v1/images` | 50 |
-| Modifica immagini | Immagine da prompt più immagini di riferimento | `POST /api/v1/images` | 49 |
-| Video da testo | Video da prompt | `POST /api/v1/videos` | 27 |
-| Video da immagine | Video da fotogramma iniziale ed eventualmente finale | `POST /api/v1/videos` | 24 |
-| Migliora video | Upscaling di un video esistente | `POST /api/v1/videos` | 1 |
-| Voce | Parlato da testo, con voce selezionabile | `POST /api/v1/audio/speech` | 18 |
-| Musica e audio | Traccia audio da descrizione | `POST /api/v1/chat/completions` | 4 |
-| Trascrizione | Testo da file audio, con timestamp opzionali | `POST /api/v1/audio/transcriptions` | 20 |
+| Images | Image from a prompt | `POST /api/v1/images` | 50 |
+| Edit images | Image from a prompt plus reference images | `POST /api/v1/images` | 49 |
+| Text to video | Video from a prompt | `POST /api/v1/videos` | 27 |
+| Image to video | Video from an opening and optional closing frame | `POST /api/v1/videos` | 24 |
+| Upscale video | Higher resolution version of an existing video | `POST /api/v1/videos` | 1 |
+| Speech | Spoken audio from text, with a selectable voice | `POST /api/v1/audio/speech` | 18 |
+| Music and audio | An audio track from a description | `POST /api/v1/chat/completions` | 4 |
+| Transcription | Text from an audio file, with optional timestamps | `POST /api/v1/audio/transcriptions` | 20 |
 
-I conteggi sono quelli letti dal catalogo il giorno della scrittura. L'app non li tiene fissi: li rilegge da OpenRouter a ogni avvio, quindi un modello pubblicato domani compare da solo.
+Those counts are what the catalog held on the day this was written. The app does not hard-code them: it re-reads the catalog from OpenRouter on every launch, so a model published tomorrow shows up on its own.
 
-## Il punto centrale del progetto
+## The idea the app is built on
 
-Nessun modello è cablato nel codice. OpenRouter espone, per ogni endpoint, i parametri che ciascun modello accetta, già tipizzati:
+No model is hard-coded. For every endpoint OpenRouter publishes the parameters each model accepts, already typed:
 
 ```json
 // GET /api/v1/images/models
@@ -49,47 +49,47 @@ Nessun modello è cablato nel codice. OpenRouter espone, per ogni endpoint, i pa
 "pricing_skus": { "duration_seconds_480p": "0.05", "duration_seconds_768p": "0.08" }
 ```
 
-Kaleido normalizza queste tre forme diverse in un'unica struttura e genera il pannello dei controlli da lì. Un modello nuovo, con parametri mai visti prima, ottiene il suo form corretto senza che venga toccata una riga di codice.
+Kaleido normalises those three different shapes into one structure and generates the control panel from it. A new model with parameters nobody has seen before gets a correct form without a line of code being touched.
 
-## Costi
+## Costs
 
-L'app distingue tre casi e lo dichiara nell'interfaccia, invece di mostrare sempre un numero:
+The app distinguishes three cases and says which one it is on screen, instead of always showing a number:
 
-- **listino** — i video sono fatturati al secondo e la tariffa è nel catalogo, quindi la stima è aritmetica esatta: tariffa × durata × quantità.
-- **misurato** — per le altre modalità la fatturazione è a token e il numero di token dipende dal risultato. Se la stessa combinazione di modello e parametri è già stata eseguita, viene mostrato il costo reale di quella volta.
-- **sconosciuto** — prima esecuzione di una combinazione: viene mostrata la tariffa unitaria e detto esplicitamente che la cifra esatta arriva a fine generazione.
+- **list price** — video is billed per second of output and the rate is in the catalog, so the estimate is exact arithmetic: rate × duration × count.
+- **measured** — other modalities are billed per token, and the token count depends on the result. If the same model and parameters have run before, the app shows what that run actually cost.
+- **unknown** — first run of a given shape: the app shows the unit rate and says plainly that the exact figure arrives when the run finishes.
 
-Il costo reale di ogni job viene letto da `usage.cost` nella risposta, salvato con il file e sommato nel contatore di spesa.
+Real cost comes from `usage.cost` in the response, is stored alongside the file, and adds up in the spend counter.
 
-## Altre cose che servono davvero usandola
+## Things that matter when you actually use it
 
-- Coda con generazioni in parallelo configurabili, avanzamento in tempo reale, annullamento.
-- Generazione in lotto: da 1 a 8 esecuzioni con la stessa configurazione.
-- Libreria di tutto il generato, con ricerca su prompt, modello e testo, filtri per modalità e tipo, preferiti, costo per file, spazio occupato.
-- Riuso con un clic: un risultato diventa l'input della modalità successiva, un prompt torna nella casella.
-- Preset salvabili per modalità, cronologia dei prompt.
-- Trascina e rilascia i file, o scegli dalla finestra di sistema.
-- Preferiti sui modelli, ricerca nel catalogo, ordinamento per prezzo o data.
-- Tema scuro e chiaro, `Ctrl+Invio` per generare, `Esc` per chiudere il visualizzatore.
-- Credito residuo OpenRouter e spesa cumulata sempre visibili.
+- A queue with configurable parallelism, live progress and cancellation.
+- Batch runs: 1 to 8 executions of the same configuration.
+- A library of everything generated, searchable by prompt, model and transcript text, filterable by mode and type, with favourites, per-file cost and disk usage.
+- One-click reuse: a result becomes the input of the next mode, a prompt goes back into the box.
+- Saved presets per mode, and prompt history.
+- Drag and drop files, or pick them from the system dialog.
+- Favourite models, catalog search, sorting by price or release date.
+- Dark and light themes, `Ctrl+Enter` to generate, `Esc` to close the viewer.
+- OpenRouter credit and cumulative spend always visible.
 
-## Sicurezza della chiave
+## Key security
 
-La chiave viene cifrata con il portachiavi del sistema operativo tramite `safeStorage` di Electron (Credential Manager su Windows, Keychain su macOS, `libsecret` su Linux) e salvata nella cartella dati dell'applicazione. Non lascia mai il computer se non verso `openrouter.ai`.
+The key is encrypted with the operating system keychain through Electron's `safeStorage` (Credential Manager on Windows, Keychain on macOS, `libsecret` on Linux) and stored in the app data folder. It never leaves the machine except towards `openrouter.ai`.
 
-Dove il portachiavi non è disponibile, Electron non fallisce: degrada silenziosamente. Kaleido registra il caso e lo dichiara nelle impostazioni con l'etichetta *salvata in chiaro*, invece di lasciar credere che sia cifrata.
+Where no keychain is available Electron does not fail, it degrades silently. Kaleido records that case and labels it in Settings as *stored in plain text*, rather than letting you believe it is encrypted.
 
-Il processo di rendering è isolato (`contextIsolation`, `sandbox`, niente Node), non ha accesso alla chiave e comunica solo tramite IPC tipizzato. I file della libreria sono serviti da un protocollo custom che rifiuta qualunque percorso fuori dalla cartella della libreria.
+The renderer process is isolated (`contextIsolation`, `sandbox`, no Node), never sees the key, and talks only over typed IPC. Library files are served by a custom protocol that rejects any path outside the library folder.
 
-## Installazione
+## Install
 
-### Pacchetti pronti
+### Prebuilt packages
 
-Gli installer per Windows, macOS e Linux vengono compilati dalla [GitHub Action](.github/workflows/build.yml) e allegati alle release.
+Installers for Windows, macOS and Linux are built by the [GitHub Action](.github/workflows/build.yml) and attached to each release.
 
-Le build non sono firmate. Windows SmartScreen e Gatekeeper su macOS mostreranno un avviso al primo avvio.
+The builds are unsigned. Windows SmartScreen and macOS Gatekeeper will warn on first launch.
 
-### Da sorgente
+### From source
 
 ```bash
 git clone https://github.com/rlpb/kaleido-studio.git
@@ -98,57 +98,66 @@ npm install
 npm start
 ```
 
-Serve Node.js 20 o superiore.
+Requires Node.js 20 or newer.
 
-### Sviluppo
+### Development
 
 ```bash
-npm run dev        # Vite in hot reload più Electron
-npm run typecheck  # TypeScript in modalità strict
-npm run check      # controlli contro il catalogo OpenRouter reale
-npm run dist       # installer per il sistema operativo corrente
+npm run dev           # Vite with hot reload plus Electron
+npm run typecheck     # TypeScript in strict mode
+npm run check         # checks against the real OpenRouter catalog
+npm run check:config  # validates electron-builder.yml offline
+npm run dist          # installers for the current operating system
 ```
 
-## Struttura
+## Layout
 
 ```
 electron/
-  main.ts         finestra, IPC, protocollo media, menu
-  preload.ts      ponte contextBridge verso il renderer
-  openrouter.ts   client API e normalizzazione delle capability
-  jobs.ts         coda, costruzione richieste, polling video, salvataggio
-  store.ts        configurazione, chiave cifrata, preset, costi osservati
-  library.ts      file su disco e indice della libreria
+  main.ts         window, IPC, media protocol, menu
+  preload.ts      contextBridge bridge to the renderer
+  openrouter.ts   API client and capability normalisation
+  jobs.ts         queue, request building, video polling, saving
+  store.ts        configuration, encrypted key, presets, observed costs
+  library.ts      files on disk and the library index
 src/
-  screens/        onboarding, studio, libreria, impostazioni
-  components/     selettore modelli, form dinamico, input, schede media
-  lib/            tipi condivisi, definizione delle modalità, prezzi
+  screens/        onboarding, studio, library, settings
+  components/     model picker, generated form, inputs, media cards, icons
+  lib/            shared types, mode definitions, pricing
 scripts/
-  selfcheck.mjs   verifica contro l'API live
+  selfcheck.mjs               checks against the live API
+  validate-builder-config.mjs validates the packaging config offline
+  make-icon.mjs               generates the app icon
 ```
 
-## Verifica
+## Verification
 
-`npm run check` interroga il catalogo pubblico di OpenRouter, senza chiave, e verifica che:
+`npm run check` queries the public OpenRouter catalog, without a key, and asserts that:
 
-- ogni modalità abbia almeno un modello;
-- ogni parametro normalizzato sia utilizzabile da un form, con enum non vuoti e intervalli coerenti;
-- i modelli video espongano durata e tariffa al secondo;
-- la modalità di modifica immagini contenga solo modelli che accettano riferimenti;
-- la stima a listino coincida con tariffa × durata × quantità;
-- una combinazione mai eseguita non produca un numero inventato.
+- every mode has at least one model;
+- every normalised parameter is usable by a form, with non-empty enums and coherent ranges;
+- video models expose a duration and a per-second rate;
+- the image editing mode only contains models that accept references;
+- the list-price estimate equals rate × duration × count;
+- a combination that has never run produces no invented number.
 
-L'ultimo controllo è il più importante: impedisce che l'interfaccia presenti una stima dove non ha i dati per farla.
+That last one matters most: it stops the interface from presenting an estimate where it has no data to make one.
 
-## Limiti noti
+`npm run check:config` validates `electron-builder.yml` against the schema `app-builder-lib` ships, offline, and names the offending key. electron-builder validates its config as the first step of a packaging run, so one unknown key otherwise fails every platform job minutes in, with a message that names the section but not the key.
 
-- Niente generazione 3D, perché OpenRouter non espone modelli con output 3D.
-- I video sono asincroni e possono richiedere minuti; il polling si interrompe dopo 20 minuti.
-- I timestamp per parola nella trascrizione dipendono dal provider e vengono ignorati da chi non li supporta.
-- La cifratura della chiave dipende dal portachiavi di sistema, assente su alcune installazioni Linux minimali.
+## Known limits
 
-## Licenza
+- No 3D generation, because OpenRouter exposes no models with 3D output.
+- Video generation is asynchronous and can take minutes; polling gives up after 20.
+- Word-level transcription timestamps depend on the provider and are ignored by those that do not support them.
+- Key encryption depends on the system keychain, which is missing on some minimal Linux installs.
 
-MIT. Vedi [LICENSE](LICENSE).
+## Contributing
 
-Kaleido Studio non è affiliato con OpenRouter.
+See [CONTRIBUTING.md](CONTRIBUTING.md). Security reports go through [SECURITY.md](SECURITY.md).
+
+## License
+
+MIT. See [LICENSE](LICENSE).
+
+Kaleido Studio is not affiliated with OpenRouter.

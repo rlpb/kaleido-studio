@@ -1,4 +1,5 @@
 import type { ParamSpec } from '../lib/types';
+import Icon from './Icon';
 
 type Value = string | number | boolean;
 
@@ -15,11 +16,11 @@ interface Props {
  */
 export default function CapabilityForm({ params, values, onChange }: Props) {
   if (!params.length) {
-    return <div className="faint">Questo modello non espone parametri: bastano il prompt e gli input.</div>;
+    return <div className="faint">This model exposes no parameters. The prompt and the inputs are all it takes.</div>;
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+    <div className="stack">
       {params.map((spec) => {
         const current = values[spec.key];
 
@@ -27,7 +28,7 @@ export default function CapabilityForm({ params, values, onChange }: Props) {
           const checked = current === undefined ? Boolean(spec.default) : Boolean(current);
           return (
             <div className="field" key={spec.key}>
-              <label className="switch" style={{ textTransform: 'none' }}>
+              <label className="switch plain">
                 <input type="checkbox" checked={checked} onChange={(e) => onChange(spec.key, e.target.checked)} />
                 <span>{spec.label}</span>
               </label>
@@ -46,7 +47,7 @@ export default function CapabilityForm({ params, values, onChange }: Props) {
                 value={current === undefined ? (spec.default ?? '') : String(current)}
                 onChange={(e) => onChange(spec.key, e.target.value === '' ? undefined : e.target.value)}
               >
-                {spec.default === undefined && <option value="">Predefinito del provider</option>}
+                {spec.default === undefined && <option value="">Provider default</option>}
                 {spec.values.map((option) => (
                   <option key={option} value={option}>
                     {option}
@@ -69,11 +70,11 @@ export default function CapabilityForm({ params, values, onChange }: Props) {
                 />
                 {spec.key === 'seed' && (
                   <button
-                    className="btn btn-sm"
-                    title="Genera un seed casuale"
+                    className="btn btn-icon"
+                    title="Roll a random seed"
                     onClick={() => onChange(spec.key, Math.floor(Math.random() * 2147483647))}
                   >
-                    ⟳
+                    <Icon name="dice" />
                   </button>
                 )}
               </div>
@@ -90,9 +91,7 @@ export default function CapabilityForm({ params, values, onChange }: Props) {
                   value={Number(current ?? spec.default ?? spec.min)}
                   onChange={(e) => onChange(spec.key, Number(e.target.value))}
                 />
-                <span className="mono faint" style={{ minWidth: 42, textAlign: 'right' }}>
-                  {Number(current ?? spec.default ?? spec.min)}
-                </span>
+                <span className="mono faint range-value">{Number(current ?? spec.default ?? spec.min)}</span>
               </div>
             )}
 

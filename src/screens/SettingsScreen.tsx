@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { bridge, type AppInfo, type KeyState } from '../lib/api';
 import type { Settings } from '../lib/types';
-import { formatCost } from '../lib/pricing';
+import { formatMoney } from '../lib/pricing';
+import Icon from '../components/Icon';
 
 type Push = (text: string, tone?: 'info' | 'ok' | 'error') => void;
 
@@ -28,118 +29,124 @@ export default function SettingsScreen({ settings, keyState, setSettings, onKeyC
     try {
       const result = await bridge.key.set(newKey.trim());
       if (!result.valid) {
-        push(result.error ?? 'Chiave rifiutata', 'error');
+        push(result.error ?? 'Key rejected', 'error');
         return;
       }
       setNewKey('');
       await onKeyChanged();
-      push('Chiave aggiornata', 'ok');
+      push('Key updated', 'ok');
     } finally {
       setBusy(false);
     }
   };
 
+  const balance = keyState.credits ? Math.max(0, keyState.credits.total - keyState.credits.used) : null;
+
   return (
     <>
       <div className="topbar">
-        <h1>Impostazioni</h1>
+        <h1>Settings</h1>
       </div>
 
       <div className="settings">
-        <div className="card">
-          <div className="section-title">Account OpenRouter</div>
+        <section className="card">
+          <div className="section-title">OpenRouter account</div>
           <div className="stat-grid">
             <div className="stat">
-              <div className="value mono">
-                {keyState.credits ? formatCost(Math.max(0, keyState.credits.total - keyState.credits.used)) : '—'}
-              </div>
-              <div className="label">Credito residuo</div>
+              <div className="value mono">{formatMoney(balance)}</div>
+              <div className="label">Credit remaining</div>
             </div>
             <div className="stat">
-              <div className="value mono">{formatCost(keyState.usage ?? 0)}</div>
-              <div className="label">Consumo della chiave</div>
+              <div className="value mono">{formatMoney(keyState.usage ?? 0)}</div>
+              <div className="label">Usage on this key</div>
             </div>
             <div className="stat">
-              <div className="value mono">{formatCost(settings.spendTotal)}</div>
-              <div className="label">Speso da Kaleido</div>
+              <div className="value mono">{formatMoney(settings.spendTotal)}</div>
+              <div className="label">Spent from Kaleido</div>
             </div>
           </div>
 
-          <div className="row" style={{ marginTop: 12, flexWrap: 'wrap' }}>
+          <div className="row wrap gap-top">
             <span className={`chip ${keyState.valid ? 'chip-ok' : 'chip-danger'}`}>
-              {keyState.valid ? 'chiave valida' : 'chiave non valida'}
+              {keyState.valid ? 'key valid' : 'key invalid'}
             </span>
             <span className={`chip ${keyState.encrypted ? 'chip-ok' : 'chip-warn'}`}>
-              {keyState.encrypted ? 'cifrata dal sistema' : 'salvata in chiaro'}
+              {keyState.encrypted ? 'encrypted by the OS' : 'stored in plain text'}
             </span>
             {keyState.label && <span className="chip mono">{keyState.label}</span>}
-            {keyState.isFreeTier && <span className="chip chip-warn">account free tier</span>}
+            {keyState.isFreeTier && <span className="chip chip-warn">free tier account</span>}
           </div>
 
           {!keyState.encrypted && (
-            <div className="help" style={{ marginTop: 8 }}>
-              Il portachiavi del sistema operativo non è disponibile su questa macchina, quindi la chiave resta in chiaro
-              nel file di configurazione dentro {info?.userData ?? 'la cartella dati'}.
+            <div className="help gap-top">
+              No operating system keychain is available on this machine, so the key sits in plain text in the
+              configuration file under {info?.userData ?? 'the app data folder'}.
             </div>
           )}
 
-          <div className="field" style={{ marginTop: 14 }}>
-            <label htmlFor="newkey">Sostituisci la chiave</label>
+          <div className="field gap-top">
+            <label htmlFor="newkey">Replace the key</label>
             <div className="row">
-              <input
-                id="newkey"
-                type="password"
-                className="mono"
-                placeholder="sk-or-v1-…"
-                value={newKey}
-                onChange={(e) => setNewKey(e.target.value)}
-              />
+              <div className="input-with-icon grow">
+                <Icon name="key" />
+                <input
+                  id="newkey"
+                  type="password"
+                  className="mono"
+                  placeholder="sk-or-v1-…"
+                  value={newKey}
+                  onChange={(e) => setNewKey(e.target.value)}
+                />
+              </div>
               <button className="btn" onClick={() => void replaceKey()} disabled={busy || !newKey.trim()}>
-                Salva
+                Save
               </button>
             </div>
           </div>
 
-          <div className="row" style={{ marginTop: 10 }}>
+          <div className="row gap-top">
             <button
-              className="btn btn-danger btn-sm"
+              className="btn btn-ghost btn-sm danger"
               onClick={async () => {
                 await bridge.key.clear();
                 await onKeyChanged();
               }}
             >
-              Rimuovi la chiave da questo computer
+              <Icon name="trash" />
+              Remove the key from this computer
             </button>
             <div className="spacer" />
             <button
               className="btn btn-ghost btn-sm"
               onClick={async () => {
                 setSettings(await bridge.settings.resetSpend());
-                push('Contatore azzerato', 'ok');
+                push('Counter reset', 'ok');
               }}
             >
-              Azzera il contatore di spesa
+              Reset the spend counter
             </button>
           </div>
-        </div>
+        </section>
 
-        <div className="card">
-          <div className="section-title">Aspetto e comportamento</div>
+        <section className="card">
+          <div className="section-title">Appearance and behaviour</div>
           <div className="field">
-            <label htmlFor="theme">Tema</label>
+            <label htmlFor="theme">Theme</label>
             <select
               id="theme"
               value={settings.theme}
-              onChange={async (e) => setSettings(await bridge.settings.update({ theme: e.target.value as Settings['theme'] }))}
+              onChange={async (e) =>
+                setSettings(await bridge.settings.update({ theme: e.target.value as Settings['theme'] }))
+              }
             >
-              <option value="dark">Scuro</option>
-              <option value="light">Chiaro</option>
-              <option value="system">Come il sistema</option>
+              <option value="dark">Dark</option>
+              <option value="light">Light</option>
+              <option value="system">Match the system</option>
             </select>
           </div>
 
-          <div className="field" style={{ marginTop: 12 }}>
-            <label htmlFor="concurrency">Generazioni in parallelo</label>
+          <div className="field gap-top">
+            <label htmlFor="concurrency">Parallel generations</label>
             <input
               id="concurrency"
               type="number"
@@ -148,56 +155,59 @@ export default function SettingsScreen({ settings, keyState, setSettings, onKeyC
               value={settings.concurrency}
               onChange={async (e) => setSettings(await bridge.settings.update({ concurrency: Number(e.target.value) }))}
             />
-            <div className="help">
-              Quante richieste partono insieme. Alzarlo accorcia le code ma consuma credito più in fretta.
-            </div>
+            <div className="help">How many requests start at once. Raising it shortens queues and spends faster.</div>
           </div>
-        </div>
+        </section>
 
-        <div className="card">
-          <div className="section-title">Libreria</div>
+        <section className="card">
+          <div className="section-title">Library</div>
           <div className="field">
-            <label>Cartella dei file generati</label>
+            <label>Folder for generated files</label>
             <div className="row">
               <input readOnly className="mono" value={settings.libraryPath} />
               <button className="btn" onClick={async () => setSettings(await bridge.settings.pickLibrary())}>
-                Cambia
+                <Icon name="folder" />
+                Change
               </button>
             </div>
             <div className="help">
-              I file già salvati restano dove sono. Spostare la cartella cambia solo dove finiscono i prossimi.
+              Files already saved stay where they are. Moving the folder only changes where the next ones land.
             </div>
           </div>
           <button
-            className="btn btn-ghost btn-sm"
-            style={{ marginTop: 10 }}
+            className="btn btn-ghost btn-sm gap-top"
             onClick={async () => {
               await bridge.prompts.clear();
-              push('Cronologia dei prompt svuotata', 'ok');
+              push('Prompt history cleared', 'ok');
             }}
           >
-            Svuota la cronologia dei prompt
+            Clear the prompt history
           </button>
-        </div>
+        </section>
 
-        <div className="card">
-          <div className="section-title">Informazioni</div>
-          <div className="mono faint" style={{ fontSize: 11.5, lineHeight: 1.7 }}>
+        <section className="card">
+          <div className="section-title">About</div>
+          <div className="mono faint about">
             <div>Kaleido Studio {info?.version}</div>
             <div>
               Electron {info?.electron} · {info?.platform}
             </div>
             <div>{info?.userData}</div>
           </div>
-          <div className="row" style={{ marginTop: 10 }}>
-            <button className="btn btn-sm" onClick={() => void bridge.app.openExternal('https://github.com/rlpb/kaleido-studio')}>
+          <div className="row gap-top">
+            <button
+              className="btn btn-sm"
+              onClick={() => void bridge.app.openExternal('https://github.com/rlpb/kaleido-studio')}
+            >
+              <Icon name="external" />
               Repository
             </button>
             <button className="btn btn-sm" onClick={() => void bridge.app.openExternal('https://openrouter.ai/docs')}>
-              Documentazione OpenRouter
+              <Icon name="external" />
+              OpenRouter docs
             </button>
           </div>
-        </div>
+        </section>
       </div>
     </>
   );
