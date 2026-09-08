@@ -1,0 +1,58 @@
+{
+  "name": "kaleido-studio",
+  "version": "1.0.0",
+  "description": "Desktop studio for AI media generation on OpenRouter: images, image editing, video, speech and transcription in one app.",
+  "private": true,
+  "type": "module",
+  "main": "dist-electron/main.cjs",
+  "author": "Kaleido Studio contributors",
+  "license": "MIT",
+  "scripts": {
+    "dev": "concurrently -k -n vite,electron -c cyan,magenta \"vite\" \"npm:dev:electron\"",
+    "dev:electron": "wait-on tcp:5173 && npm run build:electron && cross-env KALEIDO_DEV=1 electron .",
+    "build:electron": "node scripts/build-electron.mjs",
+    "build:renderer": "vite build",
+    "build": "npm run icon && npm run typecheck && npm run build:renderer && npm run build:electron",
+    "start": "npm run build && electron .",
+    "typecheck": "tsc --noEmit",
+    "dist": "npm run build && electron-builder",
+    "dist:win": "npm run build && electron-builder --win",
+    "dist:mac": "npm run build && electron-builder --mac",
+    "dist:linux": "npm run build && electron-builder --linux",
+    "check": "node scripts/selfcheck.mjs",
+    "test": "node scripts/selfcheck.mjs",
+    "icon": "node scripts/make-icon.mjs"
+  },
+  "dependencies": {
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
+  },
+  "devDependencies": {
+    "@types/node": "^26.5.0",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.7",
+    "@vitejs/plugin-react": "^6.1.1",
+    "concurrently": "^9.2.4",
+    "cross-env": "^10.1.0",
+    "electron": "^41.7.1",
+    "electron-builder": "^26.15.3",
+    "esbuild": "^0.28.2",
+    "typescript": "^7.0.2",
+    "vite": "^8.2.2",
+    "wait-on": "^9.1.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rlpb/kaleido-studio.git"
+  },
+  "keywords": [
+    "openrouter",
+    "ai",
+    "image-generation",
+    "video-generation",
+    "text-to-speech",
+    "transcription",
+    "electron",
+    "desktop"
+  ]
+}

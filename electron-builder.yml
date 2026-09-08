@@ -1,0 +1,54 @@
+appId: dev.kaleido.studio
+productName: Kaleido Studio
+copyright: Copyright © 2026 Kaleido Studio contributors
+
+directories:
+  output: release
+  buildResources: build
+
+files:
+  - dist/**/*
+  - dist-electron/**/*
+  - package.json
+
+# The renderer and main bundles are already built; nothing else ships.
+asar: true
+
+win:
+  target:
+    - target: nsis
+      arch: [x64, arm64]
+    - target: portable
+      arch: [x64]
+  artifactName: ${productName}-${version}-${arch}.${ext}
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  deleteAppDataOnUninstall: false
+  createDesktopShortcut: true
+
+mac:
+  category: public.app-category.graphics-design
+  target:
+    - target: dmg
+      arch: [x64, arm64]
+  artifactName: ${productName}-${version}-${arch}.${ext}
+  # Unsigned builds still need the entitlement to reach the network.
+  hardenedRuntime: false
+
+linux:
+  category: Graphics
+  target:
+    - target: AppImage
+      arch: [x64, arm64]
+    - target: deb
+      arch: [x64]
+  artifactName: ${productName}-${version}-${arch}.${ext}
+  desktop:
+    entry:
+      Name: Kaleido Studio
+      Comment: Generazione di immagini, video, voce e trascrizioni su OpenRouter
+
+publish: null
