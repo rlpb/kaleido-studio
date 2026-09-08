@@ -180,10 +180,22 @@ export class JobRunner {
     return [...this.jobs.values()].sort((a, b) => b.createdAt - a.createdAt);
   }
 
+  /**
+   * Sends the whole list, for changes a per-job update cannot express.
+   * Removing a job emits nothing on the job:update channel, so without this the
+   * renderer keeps showing entries the runner has already dropped.
+   */
+  private broadcast(): void {
+    if (this.window && !this.window.isDestroyed()) {
+      this.window.webContents.send('job:list', this.list());
+    }
+  }
+
   clearFinished(): void {
     for (const [id, job] of this.jobs) {
       if (job.status === 'done' || job.status === 'error' || job.status === 'cancelled') this.jobs.delete(id);
     }
+    this.broadcast();
   }
 
   cancel(id: string): void {
@@ -205,6 +217,7 @@ export class JobRunner {
     if (!job) return null;
     this.jobs.delete(id);
     this.cancelled.delete(id);
+    this.broadcast();
     const [created] = this.enqueue(
       { mode: job.mode, modelId: job.modelId, prompt: job.prompt, params: job.params, inputs: job.inputs, batch: 1 },
       job.modelName,

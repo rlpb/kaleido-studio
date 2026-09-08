@@ -36,6 +36,11 @@ const api = {
     cancel: (id: string) => call<boolean>('jobs:cancel', id),
     retry: (id: string) => call<Job | null>('jobs:retry', id),
     clear: () => call<Job[]>('jobs:clear'),
+    onList: (handler: (jobs: Job[]) => void) => {
+      const listener = (_e: unknown, jobs: Job[]) => handler(jobs);
+      ipcRenderer.on('job:list', listener);
+      return () => ipcRenderer.removeListener('job:list', listener);
+    },
     onUpdate: (handler: (job: Job) => void) => {
       const listener = (_e: unknown, job: Job) => handler(job);
       ipcRenderer.on('job:update', listener);

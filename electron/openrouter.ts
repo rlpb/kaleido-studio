@@ -1,4 +1,5 @@
 import type { Catalog, KeyStatus, ModelInfo, ModeId, ParamSpec, PriceModel } from '../src/lib/types';
+import { keepAliveRequest, type KeepAliveResponse } from './keepalive-request';
 
 const BASE = 'https://openrouter.ai/api/v1';
 const APP_HEADERS = {
@@ -171,25 +172,43 @@ async function post(path: string, key: string, body: unknown): Promise<any> {
   return readJson(res);
 }
 
-/** Posts to an endpoint that answers with raw bytes, such as speech synthesis. */
-async function postBytes(path: string, key: string, body: unknown): Promise<{ bytes: Buffer; mediaType: string }> {
-  const res = await send(
-    `${BASE}${path}`,
-    { method: 'POST', headers: headers(key, { 'Content-Type': 'application/json' }), body: JSON.stringify(body) },
-    GENERATION_TIMEOUT_MS,
-  );
-  const mediaType = res.headers.get('content-type') ?? 'application/octet-stream';
-  if (!res.ok || mediaType.includes('application/json')) {
-    const text = await res.text();
-    let msg = text.slice(0, 400);
-    try {
-      msg = JSON.parse(text)?.error?.message ?? msg;
-    } catch {
-      /* the raw text is the best message available */
-    }
-    throw new OpenRouterError(String(msg), res.ok ? 502 : res.status);
+/**
+ * The same POST, on the socket-level path that emits TCP keep-alive probes.
+ *
+ * Reserved for the synchronous generation endpoints, the ones that stay silent
+ * for as long as the model works. Catalog reads answer in under a second and
+ * gain nothing from it.
+ */
+async function postLong(path: string, key: string, body: unknown): Promise<KeepAliveResponse> {
+  const started = Date.now();
+  try {
+    return await keepAliveRequest(`${BASE}${path}`, {
+      method: 'POST',
+      headers: headers(key, { 'Content-Type': 'application/json' }),
+      body: JSON.stringify(body),
+      timeoutMs: GENERATION_TIMEOUT_MS,
+    });
+  } catch (err) {
+    throw networkError(err, GENERATION_TIMEOUT_MS, Date.now() - started);
   }
-  return { bytes: Buffer.from(await res.arrayBuffer()), mediaType };
+}
+
+/** Applies the same body-and-status handling readJson does, to a raw response. */
+function parseLong(res: KeepAliveResponse): any {
+  const text = res.body.toString('utf8');
+  let body: any = null;
+  if (text) {
+    try {
+      body = JSON.parse(text);
+    } catch {
+      throw new OpenRouterError(res.status < 400 ? 'The response was not valid JSON.' : text.slice(0, 400), res.status);
+    }
+  }
+  if (res.status >= 400 || body?.error) {
+    const msg = body?.error?.message ?? body?.detail ?? 'The request failed.';
+    throw new OpenRouterError(String(msg), res.status, body?.error?.code);
+  }
+  return body;
 }
 
 export async function getBytes(url: string, key: string): Promise<{ bytes: Buffer; mediaType: string }> {
@@ -547,7 +566,7 @@ export interface ImageResult {
 }
 
 export async function createImages(key: string, body: Record<string, unknown>): Promise<ImageResult> {
-  const res = await post('/images', key, body);
+  const res = parseLong(await postLong('/images', key, body));
   const data = Array.isArray(res?.data) ? res.data : [];
   return {
     images: data
@@ -592,7 +611,13 @@ export async function createSpeech(
   key: string,
   body: Record<string, unknown>,
 ): Promise<{ bytes: Buffer; mediaType: string }> {
-  return postBytes('/audio/speech', key, body);
+  const res = await postLong('/audio/speech', key, body);
+  const mediaType = String(res.headers['content-type'] ?? 'application/octet-stream');
+  if (res.status >= 400 || mediaType.includes('application/json')) {
+    parseLong(res); // throws with the provider's own message
+    throw new OpenRouterError('The speech endpoint returned no audio.', 502);
+  }
+  return { bytes: res.body, mediaType };
 }
 
 export interface TranscriptionResult {
@@ -602,7 +627,7 @@ export interface TranscriptionResult {
 }
 
 export async function createTranscription(key: string, body: Record<string, unknown>): Promise<TranscriptionResult> {
-  const res = await post('/audio/transcriptions', key, body);
+  const res = parseLong(await postLong('/audio/transcriptions', key, body));
   return {
     text: String(res?.text ?? ''),
     raw: res,
@@ -616,15 +641,94 @@ export interface ChatAudioResult {
   cost?: number;
 }
 
-/** Music and sound-effect models are served through chat completions. */
+/**
+ * Music and sound-effect models are served through chat completions, and the
+ * providers behind them refuse audio output unless the response is streamed:
+ * a non-streamed request comes back as "Audio output requires stream: true".
+ * So the stream is read here and reassembled into one file.
+ *
+ * Chunks are decoded before being joined rather than concatenated as base64,
+ * because a base64 chunk that is not a multiple of three bytes carries padding
+ * that would corrupt everything after it.
+ */
 export async function createChatAudio(key: string, body: Record<string, unknown>): Promise<ChatAudioResult> {
-  const res = await post('/chat/completions', key, body);
-  const message = res?.choices?.[0]?.message ?? {};
+  const res = await send(
+    `${BASE}/chat/completions`,
+    {
+      method: 'POST',
+      headers: headers(key, { 'Content-Type': 'application/json', Accept: 'text/event-stream' }),
+      body: JSON.stringify({ ...body, stream: true, stream_options: { include_usage: true } }),
+    },
+    GENERATION_TIMEOUT_MS,
+  );
+
+  if (!res.ok) {
+    // An error still arrives as a normal JSON body, not as an event stream.
+    const text = await res.text();
+    let message = text.slice(0, 400);
+    try {
+      message = JSON.parse(text)?.error?.message ?? message;
+    } catch {
+      /* the raw text is the best message available */
+    }
+    throw new OpenRouterError(String(message), res.status);
+  }
+  if (!res.body) throw new OpenRouterError('The response carried no stream.', 502);
+
+  const chunks: Buffer[] = [];
+  let format = 'mp3';
+  let text = '';
+  let cost: number | undefined;
+  let streamError: string | undefined;
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+
+    // Events are separated by a blank line; keep the trailing partial one.
+    const events = buffer.split('\n\n');
+    buffer = events.pop() ?? '';
+
+    for (const event of events) {
+      for (const line of event.split('\n')) {
+        const trimmed = line.trim();
+        if (!trimmed.startsWith('data:')) continue;
+        const payload = trimmed.slice(5).trim();
+        if (!payload || payload === '[DONE]') continue;
+
+        let parsed: any;
+        try {
+          parsed = JSON.parse(payload);
+        } catch {
+          continue; // keep-alive comments and partial frames are not fatal
+        }
+
+        if (parsed?.error) streamError = parsed.error.message ?? String(parsed.error);
+        if (typeof parsed?.usage?.cost === 'number') cost = parsed.usage.cost;
+
+        const delta = parsed?.choices?.[0]?.delta ?? {};
+        if (typeof delta.content === 'string') text += delta.content;
+        const audio = delta.audio ?? parsed?.choices?.[0]?.message?.audio;
+        if (audio?.data) {
+          chunks.push(Buffer.from(String(audio.data), 'base64'));
+          if (audio.format) format = String(audio.format);
+        }
+        if (typeof audio?.transcript === 'string') text += audio.transcript;
+      }
+    }
+  }
+
+  if (streamError) throw new OpenRouterError(streamError, 502);
+
+  const merged = Buffer.concat(chunks);
   return {
-    audio: message.audio?.data
-      ? { base64: String(message.audio.data), format: String(message.audio.format ?? 'mp3') }
-      : undefined,
-    text: typeof message.content === 'string' ? message.content : '',
-    cost: typeof res?.usage?.cost === 'number' ? res.usage.cost : undefined,
+    audio: merged.length ? { base64: merged.toString('base64'), format } : undefined,
+    text,
+    cost,
   };
 }

@@ -198,8 +198,25 @@ function registerIpc(): void {
   handle('library:delete', (id: string) => library.deleteItem(id));
   handle('library:stats', () => library.stats());
   handle('library:prune', () => library.pruneMissing());
-  handle('library:reveal', (filePath: string) => {
-    shell.showItemInFolder(filePath);
+  /**
+   * Opens the folder holding a file.
+   *
+   * `shell.showItemInFolder` selects the file, which is nicer, but it returns
+   * nothing at all: when it fails the only sign is an Explorer error dialog the
+   * app cannot catch, explain or replace. `shell.openPath` returns the failure
+   * as a string, so a problem reaches the user as an in-app message. Selecting
+   * the file is worth less than knowing whether the action worked.
+   */
+  handle('library:reveal', async (filePath: string) => {
+    const folder = path.dirname(filePath);
+    if (!fs.existsSync(filePath)) {
+      if (!fs.existsSync(folder)) throw new Error(`Neither the file nor its folder exist any more: ${filePath}`);
+      const missing = await shell.openPath(folder);
+      if (missing) throw new Error(missing);
+      throw new Error(`The file is no longer there, opened ${folder} instead.`);
+    }
+    const error = await shell.openPath(folder);
+    if (error) throw new Error(error);
     return true;
   });
   handle('library:open', (filePath: string) => shell.openPath(filePath));
