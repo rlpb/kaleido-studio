@@ -12,6 +12,7 @@ Immagini, video, voce e trascrizioni su OpenRouter, con i controlli generati dal
 [![Licenza: Apache 2.0](https://img.shields.io/badge/licenza-Apache%202.0-black.svg)](LICENSE)
 [![Node 22+](https://img.shields.io/badge/node-22%2B-blue.svg)](package.json)
 [![Piattaforme](https://img.shields.io/badge/piattaforme-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)](#download)
+[![Ko-fi](https://img.shields.io/badge/Ko--fi-sostieni-FF5E5B?logo=kofi&logoColor=white)](https://ko-fi.com/rlpb_)
 
 [Download](#download) · [Come funziona](#come-avviene-una-generazione) · [Costi](#costi) · [Sicurezza](#sicurezza-della-chiave) · [FAQ](#faq) · [English](README.md)
 
@@ -285,6 +286,16 @@ fallire tutti e tre i job di piattaforma dopo minuti, con un messaggio che nomin
 la sezione ma mai la chiave.
 
 Leggi [CONTRIBUTING.md](CONTRIBUTING.md) prima di aprire una pull request.
+
+## Sostieni il progetto
+
+Kaleido Studio è gratuito e con licenza Apache 2.0, e così resta. Non c'è una
+versione a pagamento e non c'è niente tenuto da parte. Se ti fa risparmiare
+tempo, un caffè è un bel modo per dirlo.
+
+<div align="center">
+<a href="https://ko-fi.com/rlpb_"><img src="https://ko-fi.com/img/githubbutton_sm.svg" alt="Sostieni questo progetto su Ko-fi" height="36"></a>
+</div>
 
 ## Riconoscimenti
 
