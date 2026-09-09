@@ -182,6 +182,14 @@ Gli installer per Windows, macOS e Linux sono compilati dalla
 Le build non sono firmate. Windows SmartScreen e Gatekeeper su macOS mostrano un
 avviso al primo avvio.
 
+Ogni release porta un `SHA256SUMS.txt` prodotto dallo stesso workflow che ha
+costruito gli installer, così puoi verificare che il file scaricato sia quello
+che la CI ha creato:
+
+```bash
+sha256sum -c SHA256SUMS.txt --ignore-missing
+```
+
 Serve una [chiave API OpenRouter](https://openrouter.ai/keys). La incolli al
 primo avvio e non viene chiesto altro.
 
