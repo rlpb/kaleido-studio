@@ -100,6 +100,17 @@ jobs:
       - name: List what will be attached
         run: find artifacts -type f -printf '%p  %s bytes\n'
 
+      # Published alongside the installers so anyone downloading one can check
+      # they got the file this workflow produced, and not something a mirror or
+      # a hijacked link handed them instead.
+      - name: Checksums
+        run: |
+          mkdir -p checksums
+          find artifacts -type f -exec sha256sum {} + \
+            | sed 's|artifacts/[^/]*/||' \
+            | sort -k2 > checksums/SHA256SUMS.txt
+          cat checksums/SHA256SUMS.txt
+
       - name: Notes from the changelog
         id: notes
         shell: bash
@@ -125,5 +136,7 @@ jobs:
           name: Kaleido Studio ${{ env.TAG }}
           body: ${{ steps.notes.outputs.body }}
           generate_release_notes: ${{ steps.notes.outputs.generated == 'true' }}
-          files: artifacts/**/*
+          files: |
+            artifacts/**/*
+            checksums/SHA256SUMS.txt
           fail_on_unmatched_files: true

@@ -175,6 +175,13 @@ Installers for Windows, macOS and Linux are built by
 The builds are unsigned. Windows SmartScreen and macOS Gatekeeper will warn on
 first launch.
 
+Every release carries a `SHA256SUMS.txt` produced by the same workflow that built
+the installers, so you can confirm the file you downloaded is the file CI made:
+
+```bash
+sha256sum -c SHA256SUMS.txt --ignore-missing
+```
+
 You need an [OpenRouter API key](https://openrouter.ai/keys). Paste it on first
 launch and nothing else is asked.
 
