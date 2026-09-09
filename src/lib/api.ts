@@ -70,7 +70,7 @@ interface Bridge {
   prompts: { list(): Promise<string[]>; clear(): Promise<string[]> };
   files: {
     pick(kind: 'image' | 'video' | 'audio', multiple: boolean): Promise<string[]>;
-    pathFor(file: File): string;
+    pathFor(file: File): Promise<string>;
   };
   window: { setTheme(theme: 'dark' | 'light'): Promise<boolean> };
   platform: string;

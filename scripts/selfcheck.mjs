@@ -43,6 +43,7 @@ async function load(entry, name) {
 const api = await load('electron/openrouter.ts', 'openrouter');
 const pricing = await load('src/lib/pricing.ts', 'pricing');
 const paramsLib = await load('src/lib/params.ts', 'params');
+const body = await load('electron/request-body.ts', 'request-body');
 
 console.log('\nOpenRouter catalog');
 const catalog = await api.fetchCatalog(null);
@@ -312,6 +313,70 @@ await check('a knob put back where it started stops counting as changed', () => 
   assert.equal(count({ quality: 'low', seed: 7 }), 2);
   // A key left behind by a previously selected model must not be counted.
   assert.equal(count({ resolution: '4K' }), 0, 'a key from another model inflated the count');
+});
+
+console.log('\nRequest bodies');
+
+await check('an image edit actually carries the image', async () => {
+  // The failure this catches has no error: a request that quietly loses its
+  // reference still returns a picture, just one with no relation to the input.
+  // The shape is the one the OpenAPI spec calls ContentPartImage.
+  const { readFileSync, writeFileSync, mkdtempSync } = await import('node:fs');
+  const os = await import('node:os');
+  const dir = mkdtempSync(path.join(os.tmpdir(), 'kaleido-ref-'));
+  const file = path.join(dir, 'reference.png');
+  // A one-pixel PNG, written as bytes so the check does not depend on any asset.
+  const png = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+    'base64',
+  );
+  writeFileSync(file, png);
+
+  const built = body.buildImageBody({
+    mode: 'image-edit',
+    modelId: 'openai/gpt-image-2.5-sunburst',
+    prompt: 'turn the cat into a dog',
+    params: {},
+    inputs: [file],
+    batch: 1,
+  });
+
+  assert.equal(built.model, 'openai/gpt-image-2.5-sunburst');
+  assert.equal(built.prompt, 'turn the cat into a dog');
+  assert.ok(Array.isArray(built.input_references), 'input_references is missing entirely');
+  assert.equal(built.input_references.length, 1, 'the reference image did not reach the body');
+
+  const part = built.input_references[0];
+  assert.equal(part.type, 'image_url', `ContentPartImage.type must be "image_url", got ${part.type}`);
+  assert.ok(part.image_url && typeof part.image_url.url === 'string', 'image_url.url is missing');
+
+  const url = part.image_url.url;
+  assert.ok(url.startsWith('data:image/png;base64,'), `the data URL names the wrong type: ${url.slice(0, 40)}`);
+  const carried = Buffer.from(url.slice('data:image/png;base64,'.length), 'base64');
+  assert.ok(carried.equals(png), 'the bytes in the data URL are not the bytes of the file');
+
+  // A run with no input must not send an empty array, which some providers
+  // reject outright.
+  const plain = body.buildImageBody({
+    mode: 'image',
+    modelId: 'x',
+    prompt: 'a cat',
+    params: {},
+    inputs: [],
+    batch: 1,
+  });
+  assert.equal('input_references' in plain, false, 'a plain generation sent an input_references key');
+  rmSync(dir, { recursive: true, force: true });
+});
+
+await check('an unknown extension is not passed off as an image', () => {
+  // A wrong media type is accepted by the endpoint and then ignored by the
+  // provider, which is the same silent failure as sending nothing.
+  assert.equal(body.mimeOf('a/b/photo.PNG'), 'image/png');
+  assert.equal(body.mimeOf('a/b/clip.MP4'), 'video/mp4');
+  assert.equal(body.mimeOf('a/b/voice.m4a'), 'audio/mp4');
+  assert.equal(body.mimeOf('a/b/thing.heic'), 'application/octet-stream');
+  assert.equal(body.mimeOf('a/b/noextension'), 'application/octet-stream');
 });
 
 console.log('\nHTTP client');

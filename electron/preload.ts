@@ -68,8 +68,17 @@ const api = {
   },
   files: {
     pick: (kind: 'image' | 'video' | 'audio', multiple: boolean) => call<string[]>('files:pick', kind, multiple),
-    /** Electron removed File.path, so a dropped file is resolved here instead. */
-    pathFor: (file: File) => webUtils.getPathForFile(file),
+    /**
+     * Electron removed File.path, so a dropped file is resolved here instead.
+     * The path is registered for preview before it is handed back, so the
+     * thumbnail can load without the renderer being able to name a path itself.
+     */
+    pathFor: async (file: File) => {
+      const resolved = webUtils.getPathForFile(file);
+      if (!resolved) return '';
+      await call<boolean>('files:allowPreview', resolved);
+      return resolved;
+    },
   },
   window: {
     setTheme: (theme: 'dark' | 'light') => call<boolean>('window:theme', theme),
