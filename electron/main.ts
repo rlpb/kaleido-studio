@@ -23,11 +23,38 @@ protocol.registerSchemesAsPrivileged([
 ]);
 
 /**
- * Serves a library file to the renderer. The URL carries the absolute path in a
- * query parameter rather than the pathname, because a POSIX path starts with a
- * slash that pathname parsing would swallow. The file is only served when it
- * really resolves inside the library folder, so a crafted path cannot read the
- * rest of the disk.
+ * Files outside the library that the user picked as inputs, so their thumbnails
+ * can be shown without opening the whole disk to the renderer.
+ *
+ * A path only lands here through a file dialog this process opened, or through
+ * `webUtils.getPathForFile` on a file genuinely dropped on the window. The
+ * renderer never gets to name a path itself, which is the property the library
+ * containment below exists to protect.
+ */
+const previewable = new Set<string>();
+const PREVIEWABLE_LIMIT = 200;
+
+export function allowPreview(input: string): void {
+  const resolved = path.resolve(input);
+  if (previewable.has(resolved)) return;
+  // Bounded so a long session cannot grow it without limit; the oldest entry
+  // goes, and a thumbnail that stops loading is the worst that can happen.
+  if (previewable.size >= PREVIEWABLE_LIMIT) {
+    const oldest = previewable.values().next().value;
+    if (oldest) previewable.delete(oldest);
+  }
+  previewable.add(resolved);
+}
+
+/**
+ * Serves a file to the renderer. The URL carries the absolute path in a query
+ * parameter rather than the pathname, because a POSIX path starts with a slash
+ * that pathname parsing would swallow.
+ *
+ * Two things are servable and nothing else: files inside the library folder, and
+ * files the user explicitly chose as inputs. Reference images live wherever the
+ * user keeps them, so without the second rule their thumbnails were refused and
+ * the tile rendered its alt text over the picture instead.
  */
 function serveMedia(request: Request): Promise<Response> {
   const url = new URL(request.url);
@@ -36,7 +63,8 @@ function serveMedia(request: Request): Promise<Response> {
   const resolved = path.resolve(requested);
   const root = path.resolve(store.getSettings().libraryPath);
   const relative = path.relative(root, resolved);
-  if (relative === '' || relative.startsWith('..') || path.isAbsolute(relative)) {
+  const insideLibrary = relative !== '' && !relative.startsWith('..') && !path.isAbsolute(relative);
+  if (!insideLibrary && !previewable.has(resolved)) {
     return Promise.resolve(new Response('Forbidden', { status: 403 }));
   }
   return net.fetch(pathToFileURL(resolved).toString());
@@ -261,7 +289,7 @@ function registerIpc(): void {
 
   handle('files:pick', async (kind: 'image' | 'video' | 'audio', multiple: boolean) => {
     const filters: Electron.FileFilter[] = {
-      image: [{ name: 'Immagini', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif'] }],
+      image: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif'] }],
       video: [{ name: 'Video', extensions: ['mp4', 'mov', 'webm', 'mkv'] }],
       audio: [{ name: 'Audio', extensions: ['mp3', 'wav', 'm4a', 'ogg', 'flac', 'aac', 'webm'] }],
     }[kind];
@@ -270,7 +298,18 @@ function registerIpc(): void {
       properties: multiple ? ['openFile', 'multiSelections'] : ['openFile'],
       filters,
     });
-    return result.canceled ? [] : result.filePaths;
+    if (result.canceled) return [];
+    // Chosen through a dialog this process opened, so their thumbnails may load.
+    for (const picked of result.filePaths) allowPreview(picked);
+    return result.filePaths;
+  });
+
+  // Called by the preload once webUtils has resolved a genuinely dropped file.
+  // Not exposed to the renderer as a general call: it can only be reached with a
+  // real File object, which is what keeps it from becoming a path oracle.
+  handle('files:allowPreview', (input: string) => {
+    if (typeof input === 'string' && input) allowPreview(input);
+    return true;
   });
 
   handle('window:theme', (theme) => {

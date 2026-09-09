@@ -967,8 +967,19 @@ select {
   text-align: center;
   background: rgb(0 0 0 / 68%);
   color: #fff;
-  padding: 2px 0;
+  padding: 2px 4px;
   letter-spacing: 0.02em;
+  /* Without this a long label wraps and the band swallows the whole tile. */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* A reference that cannot be read is a run that will not do what it looks like,
+   so it says so rather than showing an empty square. */
+.thumb img:not([src]),
+.thumb img[src='']{
+  display: none;
 }
 
 .thumb .remove {

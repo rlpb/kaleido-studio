@@ -69,6 +69,7 @@ export interface SaveInput {
   text?: string;
   cost?: number;
   durationMs?: number;
+  inputs?: string[];
 }
 
 /** Writes one output to disk and prepends it to the index. */
@@ -95,6 +96,7 @@ export function saveOutput(input: SaveInput): LibraryItem {
     text: input.text,
     cost: input.cost,
     durationMs: input.durationMs,
+    inputs: input.inputs?.length ? input.inputs : undefined,
     createdAt: stamp.getTime(),
     favorite: false,
     tags: [],

@@ -35,13 +35,16 @@ export default function InputAssets({ kind, label, min, max, files, onChange, fr
     if (picked.length) add(picked);
   };
 
-  const onDrop = (event: React.DragEvent) => {
+  const onDrop = async (event: React.DragEvent) => {
     event.preventDefault();
     setOver(false);
+    // The list has to be read before the first await: the drag data is cleared
+    // as soon as the handler yields.
+    const dropped = Array.from(event.dataTransfer.files);
     const paths: string[] = [];
-    for (const file of Array.from(event.dataTransfer.files)) {
+    for (const file of dropped) {
       try {
-        const path = bridge.files.pathFor(file);
+        const path = await bridge.files.pathFor(file);
         if (path) paths.push(path);
       } catch {
         // A drop from outside the filesystem has no path; ignore that item.
@@ -60,7 +63,9 @@ export default function InputAssets({ kind, label, min, max, files, onChange, fr
         <div className="thumbs">
           {files.map((path, index) => (
             <div className="thumb" key={path} title={basename(path)}>
-              {kind === 'image' && <img src={bridge.mediaUrl(path)} alt={basename(path)} />}
+              {/* Empty alt on purpose: a filename rendered into a 66px tile by a
+                  failed load covers the picture and reads as a broken layout. */}
+              {kind === 'image' && <img src={bridge.mediaUrl(path)} alt="" />}
               {kind === 'video' && <video src={bridge.mediaUrl(path)} muted />}
               {kind === 'audio' && (
                 <div className="file-glyph">
@@ -70,7 +75,12 @@ export default function InputAssets({ kind, label, min, max, files, onChange, fr
               <button className="remove" title={t('input.remove')} onClick={() => onChange(files.filter((f) => f !== path))}>
                 <Icon name="close" size={11} />
               </button>
-              <div className="badge">{frameMode ? (index === 0 ? t('input.first') : t('input.last')) : basename(path).slice(0, 10)}</div>
+              {/* A ten-character slice of a filename says nothing and does not
+                  fit. The position does say something, because references are
+                  sent in this order; the full name stays in the tooltip. */}
+              <div className="badge">
+                {frameMode ? (index === 0 ? t('input.first') : t('input.last')) : index + 1}
+              </div>
             </div>
           ))}
         </div>

@@ -160,6 +160,8 @@ export interface LibraryItem {
   cost?: number;
   /** How long the model took, from request sent to result in hand. */
   durationMs?: number;
+  /** The input files the run started from, so an edit records what it edited. */
+  inputs?: string[];
   createdAt: number;
   favorite: boolean;
   tags: string[];

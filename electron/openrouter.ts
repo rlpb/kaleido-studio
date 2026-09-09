@@ -181,11 +181,19 @@ async function post(path: string, key: string, body: unknown): Promise<any> {
  */
 async function postLong(path: string, key: string, body: unknown): Promise<KeepAliveResponse> {
   const started = Date.now();
+  const payload = JSON.stringify(body);
   try {
     return await keepAliveRequest(`${BASE}${path}`, {
       method: 'POST',
-      headers: headers(key, { 'Content-Type': 'application/json' }),
-      body: JSON.stringify(body),
+      headers: headers(key, {
+        'Content-Type': 'application/json',
+        // Declared rather than left to chunked transfer encoding. An image edit
+        // carries the reference as a base64 data URL, so it is the one request
+        // here that runs to megabytes, and a length the server can check beats a
+        // stream it has to reassemble.
+        'Content-Length': String(Buffer.byteLength(payload)),
+      }),
+      body: payload,
       timeoutMs: GENERATION_TIMEOUT_MS,
     });
   } catch (err) {
