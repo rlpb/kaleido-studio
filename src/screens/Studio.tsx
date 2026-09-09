@@ -310,6 +310,17 @@ export default function Studio({
             </div>
           )}
 
+          {/* Accepting a reference image and editing one are different
+              capabilities, and the catalog has no flag separating them. A model
+              that only takes a style hint returns a picture unrelated to the one
+              supplied, at full price, with no error anywhere. */}
+          {mode === 'image-edit' && model && !model.claimsEditing && (
+            <div className="banner banner-warn">
+              <Icon name="alert" />
+              <span>{t('studio.mayNotEdit', { n: model.maxReferences })}</span>
+            </div>
+          )}
+
           {def.needsInput && (
             <InputAssets
               kind={def.needsInput.kind}

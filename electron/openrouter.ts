@@ -511,7 +511,29 @@ function transcribeParams(): ParamSpec[] {
   ];
 }
 
-type ModelCore = Omit<ModelInfo, 'params' | 'price' | 'maxReferences' | 'supportsFrameImages' | 'isUpscaler'>;
+type ModelCore = Omit<
+  ModelInfo,
+  'params' | 'price' | 'maxReferences' | 'supportsFrameImages' | 'isUpscaler' | 'claimsEditing'
+>;
+
+/**
+ * Whether the vendor's own description says the model edits images.
+ *
+ * The catalog has no flag for it. `input_references` says a model accepts
+ * images, and that covers two different things: an editor that changes the
+ * picture you give it, and a generator that takes one image as a style or
+ * identity hint and produces something new. krea/krea-2-medium-turbo is the
+ * second kind, and asking it to turn a cat into a dog returns a dog that has
+ * nothing to do with the cat.
+ *
+ * The description is the only statement the source makes about it, so it is
+ * quoted rather than guessed at. Read together with the reference count it is a
+ * usable warning: every one of the sixteen models limited to a single reference
+ * describes itself as generation only.
+ */
+function claimsEditing(description: string): boolean {
+  return /\bedit(ing|s|or)?\b|inpaint|image-to-image|img2img/i.test(description);
+}
 
 function baseModel(entry: any): ModelCore {
   return {
@@ -562,6 +584,7 @@ export async function fetchCatalog(key: string | null): Promise<Catalog> {
       params,
       price: priceFromModelEntry(priced?.pricing, entry.id, priced?.context_length),
       maxReferences,
+      claimsEditing: claimsEditing(String(entry.description ?? priced?.description ?? '')),
       supportsFrameImages: false,
       isUpscaler: false,
     };
@@ -574,6 +597,7 @@ export async function fetchCatalog(key: string | null): Promise<Catalog> {
       params: videoParams(entry),
       price: videoPrice(entry.pricing_skus),
       maxReferences: 4,
+      claimsEditing: false,
       supportsFrameImages: Array.isArray(entry.supported_frame_images) && entry.supported_frame_images.length > 0,
       isUpscaler: entry.upscale_factor !== null && entry.upscale_factor !== undefined,
     };
@@ -585,13 +609,19 @@ export async function fetchCatalog(key: string | null): Promise<Catalog> {
       params: params(entry),
       price: priceFromModelEntry(entry.pricing, entry.id, entry.context_length),
       maxReferences: 0,
+      claimsEditing: false,
       supportsFrameImages: false,
       isUpscaler: false,
     }));
 
   const models: Record<ModeId, ModelInfo[]> = {
     image: images,
-    'image-edit': images.filter((m) => m.maxReferences > 0 && m.inputModalities.includes('image')),
+    // Models that say they edit come first, so the mode does not open on one
+    // that only takes a reference image and returns something unrelated. The
+    // sort is stable, so the catalog's own order survives inside each group.
+    'image-edit': images
+      .filter((m) => m.maxReferences > 0 && m.inputModalities.includes('image'))
+      .sort((a, b) => Number(b.claimsEditing) - Number(a.claimsEditing)),
     video: videos.filter((m) => !m.isUpscaler),
     'video-from-image': videos.filter((m) => m.supportsFrameImages && !m.isUpscaler),
     'video-upscale': videos.filter((m) => m.isUpscaler),

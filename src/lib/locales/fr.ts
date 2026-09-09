@@ -80,6 +80,8 @@ const fr: Dict = {
   'studio.clearHistoryConfirm': 'Supprimer les {n} prompts enregistrés ? Action irréversible.',
   'studio.modelParameters': 'Paramètres du modèle',
   'studio.noParameters': 'Ce modèle n’expose aucun paramètre. Le prompt et les entrées suffisent.',
+  'studio.mayNotEdit':
+    'Ce modèle accepte {n} image de référence et sa propre description le présente comme de la génération, pas de la retouche. Il peut renvoyer une image nouvelle au lieu de la vôtre modifiée. Les modèles qui annoncent la retouche sont en haut de la liste.',
   'studio.paramsCount': '{n} paramètres',
   'studio.paramsChanged': '{n} modifiés',
   'card.generationTime': 'Temps de génération',

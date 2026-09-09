@@ -6,6 +6,40 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.5.1] - 2026-09-09
+
+### Fixed
+
+- **Edit images could open on a model that does not edit.** Accepting a
+  reference image and editing one are different capabilities, and the catalog
+  has no flag separating them: krea/krea-2-medium-turbo takes one reference and
+  describes itself as image generation, so asked to turn a cat into a dog it
+  returned a photograph of a dog with no relation to the drawing, at full
+  price, with no error anywhere. Models whose own description states they edit
+  are listed first, and selecting one of the others says plainly what it is
+  likely to do. All sixteen models in the catalog limited to a single reference
+  fall in that group.
+- **Reference thumbnails never loaded.** The kal:// handler served only files
+  inside the library folder, and reference images live wherever the user keeps
+  them, so every tile got a 403 and rendered the filename from the img alt text
+  across the picture. Files chosen through the app’s own dialog, or dropped on
+  the window, are servable now; the renderer still cannot name a path itself.
+- The file dialog filter was still labelled in Italian.
+
+### Added
+
+- The library records the input files a run started from, so a result that
+  ignored its reference can be told apart from a run that never carried one.
+- Checks on the request builders, which had none. A body that quietly loses its
+  reference does not fail, it returns a plausible picture, so the checks assert
+  the image arrives in the ContentPartImage shape with byte-identical content.
+
+### Changed
+
+- The generation POST declares Content-Length instead of falling back to
+  chunked encoding. An image edit is the one request here that runs to
+  megabytes.
+
 ## [1.5.0] - 2026-09-09
 
 ### Added
@@ -288,7 +322,8 @@ First release.
   cost and disk usage.
 - Installers for Windows, macOS and Linux, built by CI.
 
-[Unreleased]: https://github.com/rlpb/kaleido-studio/compare/v1.5.0...HEAD
+[Unreleased]: https://github.com/rlpb/kaleido-studio/compare/v1.5.1...HEAD
+[1.5.1]: https://github.com/rlpb/kaleido-studio/compare/v1.5.0...v1.5.1
 [1.5.0]: https://github.com/rlpb/kaleido-studio/compare/v1.4.1...v1.5.0
 [1.4.1]: https://github.com/rlpb/kaleido-studio/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/rlpb/kaleido-studio/compare/v1.3.3...v1.4.0

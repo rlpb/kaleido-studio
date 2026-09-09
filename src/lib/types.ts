@@ -86,6 +86,12 @@ export interface ModelInfo {
   price: PriceModel;
   /** Max reference images accepted, 0 when the model cannot take any. */
   maxReferences: number;
+  /**
+   * Whether the vendor description says the model edits images. The catalog has
+   * no flag for it, and accepting a reference image is not the same capability:
+   * a generator uses it as a style hint and returns something unrelated.
+   */
+  claimsEditing: boolean;
   supportsFrameImages: boolean;
   isUpscaler: boolean;
 }

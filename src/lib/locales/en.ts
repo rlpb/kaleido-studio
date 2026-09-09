@@ -86,6 +86,8 @@ const en = {
   'studio.clearHistoryConfirm': 'Delete all {n} saved prompts? This cannot be undone.',
   'studio.modelParameters': 'Model parameters',
   'studio.noParameters': 'This model exposes no parameters. The prompt and the inputs are all it takes.',
+  'studio.mayNotEdit':
+    'This model takes {n} reference image and its own description presents it as image generation, not editing. It may return a new picture instead of a changed one. Models that state they edit are at the top of the list.',
   'studio.paramsCount': '{n} parameters',
   'studio.paramsChanged': '{n} changed',
   'card.generationTime': 'Generation time',
