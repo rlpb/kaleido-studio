@@ -315,6 +315,45 @@ await check('a knob put back where it started stops counting as changed', () => 
   assert.equal(count({ resolution: '4K' }), 0, 'a key from another model inflated the count');
 });
 
+await check('the edit mode opens on a model that says it edits', () => {
+  // Accepting a reference image and editing one are different capabilities and
+  // the catalog does not separate them. krea/krea-2-medium-turbo takes one
+  // reference and describes itself as generation: asked to turn a cat into a
+  // dog it returned a photograph of a dog, at full price, with no error.
+  const edit = catalog.models['image-edit'];
+  assert.ok(edit.length > 0, 'the edit mode is empty');
+  assert.equal(edit[0].claimsEditing, true, `the mode opens on ${edit[0].id}, which does not claim editing`);
+
+  // Asserting only on the first entry proves nothing, because the catalog
+  // already happens to start with an editor. The ordering itself is the thing
+  // being relied on, so it is the thing checked: no model that claims editing
+  // may sit after one that does not.
+  const firstGenerationOnly = edit.findIndex((m) => !m.claimsEditing);
+  if (firstGenerationOnly !== -1) {
+    const stragglers = edit.slice(firstGenerationOnly).filter((m) => m.claimsEditing);
+    assert.equal(
+      stragglers.length,
+      0,
+      `editors listed below generation-only models: ${stragglers.map((m) => m.id).join(', ')}`,
+    );
+  }
+
+  const krea = edit.find((m) => m.id === 'krea/krea-2-medium-turbo');
+  if (krea) {
+    assert.equal(krea.claimsEditing, false, 'a generation-only model is being presented as an editor');
+    assert.equal(krea.maxReferences, 1);
+  }
+  const gpt = edit.find((m) => m.id.startsWith('openai/gpt-image'));
+  if (gpt) assert.equal(gpt.claimsEditing, true, `${gpt.id} states it edits but the flag says otherwise`);
+
+  // Single-reference models are the ones that burned a real run, so the warning
+  // has to reach all of them.
+  const single = edit.filter((m) => m.maxReferences === 1);
+  const unflagged = single.filter((m) => m.claimsEditing);
+  assert.equal(unflagged.length, 0, `single-reference models presented as editors: ${unflagged.map((m) => m.id).join(', ')}`);
+  console.log(`       ${single.length} of ${edit.length} take one reference and are flagged as generation only`);
+});
+
 console.log('\nRequest bodies');
 
 await check('an image edit actually carries the image', async () => {

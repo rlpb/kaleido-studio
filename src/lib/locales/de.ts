@@ -80,6 +80,8 @@ const de: Dict = {
   'studio.clearHistoryConfirm': 'Alle {n} gespeicherten Prompts löschen? Das lässt sich nicht rückgängig machen.',
   'studio.modelParameters': 'Modellparameter',
   'studio.noParameters': 'Dieses Modell zeigt keine Parameter. Prompt und Eingaben genügen.',
+  'studio.mayNotEdit':
+    'Dieses Modell nimmt {n} Referenzbild und beschreibt sich selbst als Bildgenerierung, nicht als Bearbeitung. Es kann ein neues Bild liefern statt Ihres veränderten. Modelle, die Bearbeitung angeben, stehen oben in der Liste.',
   'studio.paramsCount': '{n} Parameter',
   'studio.paramsChanged': '{n} geändert',
   'card.generationTime': 'Generierungsdauer',

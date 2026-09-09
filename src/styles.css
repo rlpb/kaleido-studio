@@ -545,6 +545,11 @@ select {
   background: color-mix(in srgb, var(--danger) 10%, transparent);
   color: var(--danger);
 }
+.banner-warn {
+  border-color: color-mix(in srgb, var(--warn) 45%, transparent);
+  background: color-mix(in srgb, var(--warn) 10%, transparent);
+  color: var(--warn);
+}
 
 /* ==========================================================================
    Shell
