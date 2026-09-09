@@ -57,7 +57,9 @@ Otto modalità, ognuna appoggiata a un endpoint OpenRouter:
 
 Più una coda con parallelismo configurabile, generazioni in lotto, una libreria
 ricercabile di tutto il generato, preset salvati, cronologia dei prompt, modelli
-preferiti, tema chiaro e scuro, e sette lingue di interfaccia.
+preferiti, tema chiaro e scuro, e sette lingue di interfaccia. Ogni generazione
+viene cronometrata dal momento in cui la richiesta parte, così l'attesa che un
+modello costa si legge accanto al prezzo che costa.
 
 ## L'idea su cui è costruito
 
@@ -113,9 +115,9 @@ mostrare sempre un numero.
 
 - **listino** — i video sono fatturati al secondo di output e la tariffa è nel
   catalogo, quindi la stima è aritmetica esatta: tariffa × durata × quantità.
-- **misurato** — le altre modalità sono fatturate a token, e il numero di token
-  dipende dal risultato. Se la stessa combinazione di modello e parametri è già
-  stata eseguita, viene mostrato il costo reale di quella volta.
+- **misurato** — quasi tutte le altre modalità sono fatturate a token, e il
+  numero di token dipende dal risultato. Se la stessa combinazione di modello e
+  parametri è già stata eseguita, viene mostrato il costo reale di quella volta.
 - **sconosciuto** — prima esecuzione di una combinazione. Viene mostrata la
   tariffa unitaria e detto esplicitamente che la cifra esatta arriva a fine
   generazione.
@@ -124,6 +126,23 @@ Il costo reale viene letto da `usage.cost` nella risposta, salvato con il file e
 sommato nel contatore di spesa. Lo stimatore è deliberatamente incapace di
 produrre un numero che non può ricavare dal catalogo o da una misura precedente,
 e c'è un controllo che fallisce se dovesse iniziare a indovinare.
+
+### Tariffe che il catalogo pubblica senza unità di misura
+
+`pricing.prompt` contiene due unità diverse e l'API non dice mai quale. Un
+modello che dichiara un contesto in token è fatturato a token:
+`openai/gpt-4o-mini-transcribe` dichiara 128000 e riporta `0.00000125`, che è
+esattamente il prezzo pubblicato da OpenAI di $1.25 per milione di token. Un
+modello che dichiara `context_length: 0` è fatturato in altro modo:
+`microsoft/mai-transcribe-2` dichiara 0 e riporta `0.1`, che la pagina del
+modello su OpenRouter etichetta **Audio Hours … /hour**.
+
+Nessuna rotta documentata pubblica quell'etichetta: `/api/v1/models`, la rotta
+`/endpoints` e `?include=display_pricing` la omettono tutte. Quindi Kaleido
+mostra quelle tariffe alla loro scala lasciando l'unità senza nome, invece di
+moltiplicarle per un milione e chiamare il risultato prezzo per token. Nel
+catalogo attuale sono trenta i modelli in questo caso, e un controllo fallisce se
+uno di essi torna a essere etichettato come fatturato a token.
 
 
 ## Sicurezza della chiave
