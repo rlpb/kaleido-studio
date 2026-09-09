@@ -513,26 +513,50 @@ function transcribeParams(): ParamSpec[] {
 
 type ModelCore = Omit<
   ModelInfo,
-  'params' | 'price' | 'maxReferences' | 'supportsFrameImages' | 'isUpscaler' | 'claimsEditing'
+  'params' | 'price' | 'maxReferences' | 'supportsFrameImages' | 'isUpscaler' | 'editsImages'
 >;
 
 /**
  * Whether the vendor's own description says the model edits images.
  *
- * The catalog has no flag for it. `input_references` says a model accepts
- * images, and that covers two different things: an editor that changes the
- * picture you give it, and a generator that takes one image as a style or
- * identity hint and produces something new. krea/krea-2-medium-turbo is the
- * second kind, and asking it to turn a cat into a dog returns a dog that has
- * nothing to do with the cat.
+ * `input_references` says a model accepts images, and that covers two different
+ * things: an editor that changes the picture you give it, and a generator that
+ * takes one image as a style or identity hint and produces something new.
+ * krea/krea-2-medium-turbo is the second kind, and asking it to turn a cat into
+ * a dog returns a dog with nothing to do with the cat.
  *
- * The description is the only statement the source makes about it, so it is
- * quoted rather than guessed at. Read together with the reference count it is a
- * usable warning: every one of the sixteen models limited to a single reference
- * describes itself as generation only.
+ * On its own this signal is not enough. Six models say they edit and eight more
+ * plainly do without saying so, openai/gpt-5-image and
+ * google/gemini-2.5-flash-image among them, so filtering on the prose alone
+ * would drop real editors. It is one half of `editsImages` below.
  */
 function claimsEditing(description: string): boolean {
   return /\bedit(ing|s|or)?\b|inpaint|image-to-image|img2img/i.test(description);
+}
+
+/**
+ * Whether any endpoint charges for the image you supply.
+ *
+ * The catalog separates the two cases in its own billing vocabulary: an editor
+ * bills `input_image` because it consumes the picture, while a style model bills
+ * `input_reference`. recraft/recraft-v4-styles bills the second and never the
+ * first, which is the source stating what those images are for.
+ *
+ * Read only for models the description leaves undecided, because the request
+ * costs a round trip per model and one that already says it edits needs no
+ * second opinion.
+ */
+async function billsForInputImage(modelId: string, key: string | null): Promise<boolean> {
+  try {
+    const body = await get(`/images/models/${modelId}/endpoints`, key);
+    const endpoints: any[] = Array.isArray(body?.endpoints) ? body.endpoints : [];
+    return endpoints.some((endpoint) =>
+      (Array.isArray(endpoint?.pricing) ? endpoint.pricing : []).some((row: any) => row?.billable === 'input_image'),
+    );
+  } catch {
+    // A model whose endpoints cannot be read keeps whatever its description said.
+    return false;
+  }
 }
 
 function baseModel(entry: any): ModelCore {
@@ -584,7 +608,7 @@ export async function fetchCatalog(key: string | null): Promise<Catalog> {
       params,
       price: priceFromModelEntry(priced?.pricing, entry.id, priced?.context_length),
       maxReferences,
-      claimsEditing: claimsEditing(String(entry.description ?? priced?.description ?? '')),
+      editsImages: claimsEditing(String(entry.description ?? priced?.description ?? '')),
       supportsFrameImages: false,
       isUpscaler: false,
     };
@@ -597,11 +621,26 @@ export async function fetchCatalog(key: string | null): Promise<Catalog> {
       params: videoParams(entry),
       price: videoPrice(entry.pricing_skus),
       maxReferences: 4,
-      claimsEditing: false,
+      editsImages: false,
       supportsFrameImages: Array.isArray(entry.supported_frame_images) && entry.supported_frame_images.length > 0,
       isUpscaler: entry.upscale_factor !== null && entry.upscale_factor !== undefined,
     };
   });
+
+  // Which of the models that accept images actually edit them.
+  //
+  // The description settles most of it. For the rest the endpoint records do,
+  // because the catalog bills `input_image` for a picture the model consumes and
+  // `input_reference` for one it only takes as a style hint. Only the undecided
+  // ones are looked up, so this costs a request per model the prose left open
+  // rather than one per model.
+  const takesImages = images.filter((m) => m.maxReferences > 0 && m.inputModalities.includes('image'));
+  const undecided = takesImages.filter((m) => !m.editsImages);
+  const billsImage = await Promise.all(undecided.map((m) => billsForInputImage(m.id, key)));
+  undecided.forEach((model, i) => {
+    model.editsImages = billsImage[i];
+  });
+  const editors = takesImages.filter((m) => m.editsImages);
 
   const simple = (entries: any[], params: (e: any) => ParamSpec[]): ModelInfo[] =>
     entries.map((entry: any) => ({
@@ -609,19 +648,14 @@ export async function fetchCatalog(key: string | null): Promise<Catalog> {
       params: params(entry),
       price: priceFromModelEntry(entry.pricing, entry.id, entry.context_length),
       maxReferences: 0,
-      claimsEditing: false,
+      editsImages: false,
       supportsFrameImages: false,
       isUpscaler: false,
     }));
 
   const models: Record<ModeId, ModelInfo[]> = {
     image: images,
-    // Models that say they edit come first, so the mode does not open on one
-    // that only takes a reference image and returns something unrelated. The
-    // sort is stable, so the catalog's own order survives inside each group.
-    'image-edit': images
-      .filter((m) => m.maxReferences > 0 && m.inputModalities.includes('image'))
-      .sort((a, b) => Number(b.claimsEditing) - Number(a.claimsEditing)),
+    'image-edit': editors,
     video: videos.filter((m) => !m.isUpscaler),
     'video-from-image': videos.filter((m) => m.supportsFrameImages && !m.isUpscaler),
     'video-upscale': videos.filter((m) => m.isUpscaler),

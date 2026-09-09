@@ -80,8 +80,6 @@ const it: Dict = {
   'studio.clearHistoryConfirm': 'Eliminare tutti i {n} prompt salvati? Non si può annullare.',
   'studio.modelParameters': 'Parametri del modello',
   'studio.noParameters': 'Questo modello non espone parametri. Bastano il prompt e gli input.',
-  'studio.mayNotEdit':
-    'Questo modello accetta {n} immagine di riferimento e la sua descrizione lo presenta come generazione, non modifica. Può restituire un’immagine nuova invece di quella cambiata. I modelli che dichiarano di modificare sono in cima alla lista.',
   'studio.paramsCount': '{n} parametri',
   'studio.paramsChanged': '{n} modificati',
   'card.generationTime': 'Tempo di generazione',
