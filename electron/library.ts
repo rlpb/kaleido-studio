@@ -68,6 +68,7 @@ export interface SaveInput {
   bytes: Buffer;
   text?: string;
   cost?: number;
+  durationMs?: number;
 }
 
 /** Writes one output to disk and prepends it to the index. */
@@ -93,6 +94,7 @@ export function saveOutput(input: SaveInput): LibraryItem {
     mediaType: input.mediaType,
     text: input.text,
     cost: input.cost,
+    durationMs: input.durationMs,
     createdAt: stamp.getTime(),
     favorite: false,
     tags: [],

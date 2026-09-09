@@ -55,7 +55,9 @@ Eight modes, each backed by an OpenRouter endpoint:
 
 Plus a queue with configurable parallelism, batch runs, a searchable library of
 everything generated, saved presets, prompt history, favourite models, dark and
-light themes, and seven interface languages.
+light themes, and seven interface languages. Every run is timed from the moment
+the request goes out, so the wait a model costs you is visible next to the price
+it costs you.
 
 ## The idea it is built on
 
@@ -109,7 +111,7 @@ always showing a number.
 
 - **list price** — video is billed per second of output and the rate is in the
   catalog, so the estimate is exact arithmetic: rate × duration × count.
-- **measured** — other modalities are billed per token, and the token count
+- **measured** — most other modalities are billed per token, and the token count
   depends on the result. If the same model and parameters have run before, the
   app shows what that run actually cost.
 - **unknown** — first run of a given shape. The app shows the unit rate and says
@@ -119,6 +121,22 @@ Real cost comes from `usage.cost` in the response, is stored with the file, and
 adds up in the spend counter. The estimator is deliberately unable to produce a
 number it cannot derive from catalog data or a previous measurement, and there
 is a check that fails if it ever starts guessing.
+
+### Rates the catalog publishes without a unit
+
+`pricing.prompt` carries two different units and the API names neither. A model
+that declares a token context is billed per token: `openai/gpt-4o-mini-transcribe`
+declares 128000 and lists `0.00000125`, which is OpenAI's published $1.25 per
+million tokens. A model that declares `context_length: 0` is billed by something
+else: `microsoft/mai-transcribe-2` declares 0 and lists `0.1`, which OpenRouter's
+own model page labels **Audio Hours … /hour**.
+
+No documented route publishes that label. `/api/v1/models`, the `/endpoints`
+route and `?include=display_pricing` all omit it. So Kaleido shows those rates at
+their own scale with the unit left unnamed, rather than multiplying by a million
+and calling the result a token price. Thirty models in the current catalog fall
+into this case, and a check fails if any of them is ever labelled per token
+again.
 
 
 ## Key security

@@ -274,7 +274,10 @@ export class JobRunner {
       return;
     }
 
-    this.emit({ ...job, status: 'running', progressKey: 'progress.sending' });
+    // Timed from here, not from enqueue: waiting in the queue is not the model
+    // taking its time, and a batch of eight would otherwise report the last one
+    // as having taken as long as the whole batch.
+    this.emit({ ...job, status: 'running', progressKey: 'progress.sending', startedAt: Date.now() });
     try {
       const req: JobRequest = {
         mode: job.mode,
@@ -321,7 +324,11 @@ export class JobRunner {
   }
 
   private store(job: Job, kind: MediaKind, mediaType: string, bytes: Buffer, cost?: number, text?: string): LibraryItem {
+    // Read back from the map rather than from the captured job: startedAt is
+    // stamped on the emitted copy, and the argument here predates it.
+    const startedAt = this.jobs.get(job.id)?.startedAt;
     return saveOutput({
+      durationMs: startedAt ? Date.now() - startedAt : undefined,
       jobId: job.id,
       mode: job.mode,
       modelId: job.modelId,

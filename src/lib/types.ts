@@ -50,6 +50,18 @@ export interface PriceModel {
   perAudioInputToken?: number;
   /** USD per output audio token. */
   perAudioOutputToken?: number;
+  /**
+   * Whether `perInputToken` and `perOutputToken` are really per token.
+   *
+   * The catalog reports both under `pricing.prompt` and `pricing.completion`
+   * whatever the billing unit is, and names the unit nowhere in the public API.
+   * A declared token context is the one signal that separates the two:
+   * openai/gpt-4o-mini-transcribe declares 128000 and its rate matches OpenAI's
+   * published per-token price, while microsoft/mai-transcribe-2 declares 0 and
+   * its rate is per hour of audio. When this is false the number is still the
+   * real rate, but its unit is unknown and must not be stated.
+   */
+  tokenBilled: boolean;
   /** True only for OpenRouter's explicit free tier, the ":free" model ids. */
   free: boolean;
   /**
@@ -125,6 +137,8 @@ export interface Job {
     | 'progress.cancelled';
   progressVars?: Record<string, string | number>;
   createdAt: number;
+  /** When the request actually went out, so queue waiting is not counted as generation time. */
+  startedAt?: number;
   finishedAt?: number;
   cost?: number;
   error?: string;
@@ -144,6 +158,8 @@ export interface LibraryItem {
   mediaType: string;
   text?: string;
   cost?: number;
+  /** How long the model took, from request sent to result in hand. */
+  durationMs?: number;
   createdAt: number;
   favorite: boolean;
   tags: string[];

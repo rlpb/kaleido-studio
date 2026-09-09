@@ -36,7 +36,8 @@ export type IconName =
   | 'external'
   | 'key'
   | 'wallet'
-  | 'play';
+  | 'play'
+  | 'clock';
 
 /** Stroked paths, drawn on a 24×24 viewBox. */
 const PATHS: Record<IconName, string> = {
@@ -70,6 +71,7 @@ const PATHS: Record<IconName, string> = {
   key: 'M15.5 3.5a5 5 0 1 0-4.4 7.4l.6 0L3.5 19v2h3v-2h2v-2h2v-2.2l1.5-1.5a5 5 0 0 0 3.5-8.6zM16.5 7.5h.01',
   wallet: 'M3.5 7.5a1 1 0 0 1 1-1h13a1 1 0 0 1 1 1v1M3.5 7.5v10a1 1 0 0 0 1 1h15a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-15M17 13h.01',
   play: 'M8 5.5l11 6.5-11 6.5z',
+  clock: 'M12 20.5a8.5 8.5 0 1 0 0-17 8.5 8.5 0 0 0 0 17zM12 7.5V12l3 1.8',
 };
 
 /** Filled icons read better than stroked ones at small sizes. */

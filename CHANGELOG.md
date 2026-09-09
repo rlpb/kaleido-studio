@@ -6,6 +6,48 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-09-09
+
+### Added
+
+- **Every run is timed.** A running job counts up from the moment the request
+  goes out, and the finished result carries how long it took next to what it
+  cost. Timing starts at the request, not at the queue, so a batch of eight does
+  not report the last one as having taken as long as the whole batch.
+- **The prompt history can be cleared from where it is visible.** The control
+  existed, buried in Settings, and left the open dropdown showing entries that
+  were already gone. It now sits next to the list, asks first, and the list
+  updates.
+
+### Changed
+
+- **The model parameters are collapsed by default.** Most runs use the provider
+  defaults, so the knobs are worth a click only when one of them needs changing.
+  A badge on the closed panel counts the ones that were touched, so collapsing
+  never hides a setting.
+
+### Fixed
+
+- **Rates were quoted per million tokens on models that do not bill per token.**
+  `pricing.prompt` carries two different units and the public API names neither.
+  A model with a token context is billed per token, and one with
+  `context_length: 0` is billed by something else: microsoft/mai-transcribe-2
+  lists `0.1`, which OpenRouter's own model page labels "Audio Hours … /hour",
+  and Kaleido displayed it as $100000 per million tokens. Thirty models in the
+  current catalog are affected. Those rates now show at their own scale with the
+  unit left unnamed, because no documented route publishes it and inventing one
+  would be the same mistake in the other direction.
+- **Editing an image sometimes ran as a plain text-to-image generation.** The
+  screen reset its own state whenever settings were written, and two ordinary
+  actions write settings: choosing a model, and finishing a job. The reset
+  cleared the attached images and the chosen parameters, so the next run went out
+  with no reference at all and came back unrelated to the picture on screen.
+- **The changed-parameter badge could not be cleared.** A slider on a model that
+  declares no default rests at its minimum and a checkbox rests unticked, but
+  both were compared against the declared default, which is undefined. Moving one
+  and putting it back left a count nothing could undo.
+- `index.html` declared `lang="it"` in an otherwise English source tree.
+
 ## [1.4.1] - 2026-09-08
 
 An audit pass over the repository, the code and every screen. Four defects, all
@@ -246,7 +288,8 @@ First release.
   cost and disk usage.
 - Installers for Windows, macOS and Linux, built by CI.
 
-[Unreleased]: https://github.com/rlpb/kaleido-studio/compare/v1.4.1...HEAD
+[Unreleased]: https://github.com/rlpb/kaleido-studio/compare/v1.5.0...HEAD
+[1.5.0]: https://github.com/rlpb/kaleido-studio/compare/v1.4.1...v1.5.0
 [1.4.1]: https://github.com/rlpb/kaleido-studio/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/rlpb/kaleido-studio/compare/v1.3.3...v1.4.0
 [1.3.3]: https://github.com/rlpb/kaleido-studio/compare/v1.3.2...v1.3.3

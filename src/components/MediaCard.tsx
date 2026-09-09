@@ -1,6 +1,6 @@
 import { bridge } from '../lib/api';
 import type { MediaKind } from '../lib/types';
-import { formatCost } from '../lib/pricing';
+import { formatCost, formatDuration } from '../lib/pricing';
 import Icon from './Icon';
 import { useT } from '../lib/i18n';
 
@@ -13,6 +13,7 @@ export interface MediaRef {
   modelName: string;
   text?: string;
   cost?: number;
+  durationMs?: number;
   createdAt: number;
   favorite?: boolean;
 }
@@ -73,7 +74,14 @@ export function MediaCard({ item, onOpen, onReuse, onUsePrompt, onToggleFavorite
           <span className="ellipsis">{item.modelName}</span>
           {item.cost !== undefined && <span className="mono">{formatCost(item.cost, t)}</span>}
         </div>
-        <div className="faint tiny">{timeOf(item.createdAt)}</div>
+        <div className="spread faint tiny">
+          <span>{timeOf(item.createdAt)}</span>
+          {item.durationMs !== undefined && (
+            <span className="mono" title={t('card.generationTime')}>
+              <Icon name="clock" size={11} /> {formatDuration(item.durationMs)}
+            </span>
+          )}
+        </div>
 
         <div className="media-actions">
           {onToggleFavorite && (

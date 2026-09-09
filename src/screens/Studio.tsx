@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { bridge } from '../lib/api';
 import type { Catalog, Job, ModelInfo, ModeId, Preset, Settings } from '../lib/types';
+import { countChanged, defaultsFor } from '../lib/params';
 import { MODE_BY_ID, PROMPT_REQUIRED } from '../lib/modes';
-import { estimateCost, formatCost, priceSummary } from '../lib/pricing';
+import { estimateCost, formatCost, formatDuration, priceSummary } from '../lib/pricing';
 import ModelPicker from '../components/ModelPicker';
 import CapabilityForm from '../components/CapabilityForm';
 import InputAssets from '../components/InputAssets';
@@ -28,13 +29,16 @@ interface Props {
   setSettings: (settings: Settings) => void;
 }
 
-/** Seeds the form with every default the model declares. */
-function defaultsFor(model: ModelInfo | undefined): Record<string, Value> {
-  const values: Record<string, Value> = {};
-  for (const spec of model?.params ?? []) {
-    if ('default' in spec && spec.default !== undefined) values[spec.key] = spec.default;
-  }
-  return values;
+/** Counts up once a second so a running job shows how long it has been working. */
+function Elapsed({ since }: { since?: number }) {
+  const [, tick] = useState(0);
+  useEffect(() => {
+    if (!since) return;
+    const id = window.setInterval(() => tick((n) => n + 1), 1000);
+    return () => window.clearInterval(id);
+  }, [since]);
+  if (!since) return null;
+  return <span className="mono tiny">{formatDuration(Date.now() - since)}</span>;
 }
 
 const BASIS_TONE: Record<string, string> = {
@@ -72,18 +76,28 @@ export default function Studio({
 
   const model = useMemo(() => models.find((m) => m.id === modelId), [models, modelId]);
 
-  // Pick up the model remembered for this mode, or fall back to the first one.
+  // Read through a ref so this effect depends on the mode and the catalog only.
+  //
+  // Depending on the settings object made it fire on every unrelated settings
+  // write, and two of those happen while a user is working: choosing a model
+  // saves lastModelByMode, and finishing a job reloads settings to refresh the
+  // balance. Each one re-ran the reset below, which cleared the attached input
+  // images and threw away the parameters the user had set. In Edit images that
+  // turned an edit into a plain text-to-image run, so the result came back with
+  // no relation to the picture that had been attached.
+  const rememberedModels = useRef(settings.lastModelByMode);
+  rememberedModels.current = settings.lastModelByMode;
+
   useEffect(() => {
     if (!models.length) {
       setModelId(null);
       return;
     }
-    const remembered = settings.lastModelByMode[mode];
-    const next = models.find((m) => m.id === remembered) ?? models[0];
+    const next = models.find((m) => m.id === rememberedModels.current[mode]) ?? models[0];
     setModelId(next.id);
     setParams(defaultsFor(next));
     setInputs([]);
-  }, [mode, models, settings.lastModelByMode]);
+  }, [mode, models]);
 
   useEffect(() => {
     void bridge.presets.list().then(setPresets);
@@ -112,6 +126,11 @@ export default function Studio({
     () => estimateCost(model, params, batch, settings.observedCosts),
     [model, params, batch, settings.observedCosts],
   );
+
+  // How many knobs sit at something other than where they rest, so a collapsed
+  // panel still says whether anything inside it was touched. Counted over the
+  // model's own specs, so a leftover key from a previous model cannot inflate it.
+  const changedParams = useMemo(() => countChanged(model, params), [model, params]);
 
   const promptNeeded = PROMPT_REQUIRED.includes(mode);
   const promptUseful = promptNeeded || mode === 'video-from-image' || mode === 'video-upscale';
@@ -159,6 +178,10 @@ export default function Studio({
             prompt: job.prompt,
             modelName: job.modelName,
             cost: i === 0 ? job.cost : undefined,
+            // The duration belongs to the run, not to one file of it, so every
+            // output of a multi-image response carries the same figure.
+            durationMs:
+              job.finishedAt !== undefined && job.startedAt !== undefined ? job.finishedAt - job.startedAt : undefined,
             createdAt: job.finishedAt ?? job.createdAt,
           })),
         ),
@@ -252,19 +275,37 @@ export default function Studio({
                 onChange={(e) => setPrompt(e.target.value)}
               />
               {history.length > 0 && (
-                <select
-                  value=""
-                  onChange={(e) => {
-                    if (e.target.value) setPrompt(e.target.value);
-                  }}
-                >
-                  <option value="">{t('studio.reuseRecentPrompt')}</option>
-                  {history.slice(0, 30).map((entry, i) => (
-                    <option key={i} value={entry}>
-                      {entry.slice(0, 90)}
-                    </option>
-                  ))}
-                </select>
+                <div className="row">
+                  <select
+                    className="grow"
+                    value=""
+                    onChange={(e) => {
+                      if (e.target.value) setPrompt(e.target.value);
+                    }}
+                  >
+                    <option value="">{t('studio.reuseRecentPrompt')}</option>
+                    {history.slice(0, 30).map((entry, i) => (
+                      <option key={i} value={entry}>
+                        {entry.slice(0, 90)}
+                      </option>
+                    ))}
+                  </select>
+                  {/* Sits next to the list rather than in Settings, so clearing
+                      it is where the thing being cleared is visible, and the
+                      list on screen updates instead of going stale. */}
+                  <button
+                    className="btn btn-ghost btn-icon danger"
+                    title={t('studio.clearHistory')}
+                    onClick={async () => {
+                      if (!window.confirm(t('studio.clearHistoryConfirm', { n: history.length }))) return;
+                      await bridge.prompts.clear();
+                      setHistory([]);
+                      push(t('settings.promptsCleared'), 'ok');
+                    }}
+                  >
+                    <Icon name="trash" />
+                  </button>
+                </div>
               )}
             </div>
           )}
@@ -283,10 +324,22 @@ export default function Studio({
             />
           )}
 
-          <div>
-            <div className="section-title">{t('studio.modelParameters')}</div>
+          {/* Collapsed by default: most runs use the provider defaults, and the
+              knobs are worth a click only when one of them needs changing. The
+              badge keeps a closed section from hiding a setting the user made. */}
+          <details className="params">
+            <summary>
+              <Icon name="chevronDown" />
+              <span className="section-title">{t('studio.modelParameters')}</span>
+              <div className="spacer" />
+              {changedParams > 0 ? (
+                <span className="chip chip-accent tiny">{t('studio.paramsChanged', { n: changedParams })}</span>
+              ) : (
+                <span className="faint tiny">{t('studio.paramsCount', { n: model?.params.length ?? 0 })}</span>
+              )}
+            </summary>
             <CapabilityForm params={model?.params ?? []} values={params} onChange={setParam} />
-          </div>
+          </details>
 
           {modePresets.length > 0 && (
             <div className="field">
@@ -366,7 +419,15 @@ export default function Studio({
                   <div className="job-body">
                     <div className="spread">
                       <strong className="small">{job.modelName}</strong>
-                      <span className="faint mono tiny">{t(job.progressKey, job.progressVars)}</span>
+                      <span className="faint mono tiny">
+                        {t(job.progressKey, job.progressVars)}
+                        {job.startedAt !== undefined && (
+                          <>
+                            {' · '}
+                            <Elapsed since={job.startedAt} />
+                          </>
+                        )}
+                      </span>
                     </div>
                     <div className="faint tiny ellipsis">{job.prompt || t('studio.noPrompt')}</div>
                     <div className="bar">

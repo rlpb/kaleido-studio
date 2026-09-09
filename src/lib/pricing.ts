@@ -49,12 +49,18 @@ function significant(value: number, digits = 3): string {
 }
 
 /**
- * Per-token rates run to fifteen decimal places, which is unreadable. Every
- * provider quotes them per million tokens, so that is how they are shown.
+ * The rate a model's headline price should quote, and whether its unit is known.
+ *
+ * Image-token and audio-token fields name their own unit, so they are per token
+ * regardless. `perInputToken` only means tokens when the model declares a token
+ * context; otherwise the catalog published a number and named no unit, and the
+ * honest thing is to show the number and say so.
  */
-function formatRate(perUnit: number, unit: string): string {
-  if (unit === 'token') return `$${significant(perUnit * 1_000_000)} / M tokens`;
-  return `$${significant(perUnit)} / ${unit}`;
+function headlineRate(price: ModelInfo['price']): { rate: number; perToken: boolean } | null {
+  const perToken = price.perImageToken ?? price.perAudioOutputToken;
+  if (perToken) return { rate: perToken, perToken: true };
+  if (price.perInputToken) return { rate: price.perInputToken, perToken: price.tokenBilled };
+  return null;
 }
 
 /** One line describing how a model bills, whatever scheme it uses. */
@@ -68,12 +74,27 @@ export function priceSummary(model: ModelInfo, t: Translate): string {
       ? t('picker.perVideoSecond', { rate: `$${significant(min)}` })
       : t('picker.perVideoSecondRange', { min: `$${significant(min)}`, max: `$${significant(max)}` });
   }
-  const perToken = model.price.perImageToken ?? model.price.perAudioOutputToken ?? model.price.perInputToken;
-  if (perToken) return t('picker.perMillionTokens', { rate: `$${significant(perToken * 1_000_000)}` });
+  const headline = headlineRate(model.price);
+  if (headline) {
+    // Per-token rates run to fifteen decimal places, so they are quoted per
+    // million the way every provider quotes them. A rate whose unit is unknown
+    // is left at its own scale, because scaling it by a million would be
+    // asserting the very thing that is not known.
+    return headline.perToken
+      ? t('picker.perMillionTokens', { rate: `$${significant(headline.rate * 1_000_000)}` })
+      : t('picker.rateNoUnit', { rate: `$${significant(headline.rate)}` });
+  }
   return model.price.free ? t('picker.free') : t('picker.priceUnpublished');
 }
 
-/** Lower is cheaper. Used to sort the model list by price. */
+/**
+ * Lower is cheaper. Used to sort the model list by price.
+ *
+ * Within one billing scheme this orders correctly. Across schemes it cannot:
+ * a rate whose unit the catalog never published is not comparable to a per-token
+ * one, and inventing a conversion to make the sort look right would be the same
+ * mistake as inventing the unit.
+ */
 export function cheapness(model: ModelInfo): number {
   const seconds = model.price.perVideoSecond;
   if (seconds && Object.keys(seconds).length) return Math.min(...Object.values(seconds));
@@ -129,15 +150,21 @@ export function estimateCost(
     return { total: null, basis: 'unknown', detailKey: 'cost.unpublished' };
   }
 
-  const rate = model.price.perImageToken ?? model.price.perAudioOutputToken ?? model.price.perOutputToken;
-  return rate
+  const headline = headlineRate(model.price);
+  if (!headline) return { total: null, basis: 'unknown', detailKey: 'cost.unknown' };
+  return headline.perToken
     ? {
         total: null,
         basis: 'unknown',
         detailKey: 'cost.rate',
-        detailVars: { rate: formatRate(rate, 'token') },
+        detailVars: { rate: `$${significant(headline.rate * 1_000_000)} / M tokens` },
       }
-    : { total: null, basis: 'unknown', detailKey: 'cost.unknown' };
+    : {
+        total: null,
+        basis: 'unknown',
+        detailKey: 'cost.rateNoUnit',
+        detailVars: { rate: `$${significant(headline.rate)}` },
+      };
 }
 
 /** Pass the translator to have a zero read as "free" in the chosen language. */
@@ -161,6 +188,25 @@ export function formatMoney(value: number | null | undefined): string {
   // like a precision the number does not have.
   const text = value > 0 && value < 1 ? value.toFixed(4).replace(/(\.\d*?)0+$/, '$1') : value.toFixed(2);
   return `$${text.replace(/\.$/, '')}`;
+}
+
+/**
+ * How long a run took. Sub-minute times keep a decimal because the difference
+ * between 3s and 3.4s is what a user comparing two models is looking at.
+ */
+export function formatDuration(ms: number | null | undefined): string {
+  if (ms === null || ms === undefined || !Number.isFinite(ms) || ms < 0) return '—';
+  const seconds = ms / 1000;
+  // Rounded before the unit is chosen, not after. Deciding first and rounding
+  // second prints 59.6 seconds as "60s" and 119.6 as "1m 60s", neither of which
+  // is a time anybody writes.
+  const tenths = Number(seconds.toFixed(1));
+  if (tenths < 10) return `${tenths.toFixed(1)}s`;
+  const whole = Math.round(seconds);
+  if (whole < 60) return `${whole}s`;
+  const minutes = Math.floor(whole / 60);
+  const rest = whole % 60;
+  return rest ? `${minutes}m ${rest}s` : `${minutes}m`;
 }
 
 export function formatBytes(bytes: number): string {

@@ -290,7 +290,31 @@ const NOT_A_FORM_FIELD = new Set([
   'callback_url',
 ]);
 
-function priceFromModelEntry(pricing: Record<string, string> | undefined, modelId = ''): PriceModel {
+/**
+ * `pricing.prompt` carries two different units and the catalog never says which.
+ * A model with a token context is billed per token: openai/gpt-4o-mini-transcribe
+ * declares 128000 and lists 0.00000125, which is OpenAI's published $1.25 per
+ * million tokens. A model with `context_length: 0` is billed by something else
+ * entirely: microsoft/mai-transcribe-2 declares 0 and lists 0.1, which
+ * OpenRouter's own model page labels "Audio Hours … /hour". Reading the second
+ * one as a token rate is how $0.10 per hour of audio came to be displayed as
+ * $100000 per million tokens.
+ *
+ * No documented route publishes the unit. `/api/v1/models`, the `/endpoints`
+ * route and `?include=display_pricing` all omit it; only the website's own
+ * embedded JSON carries `display_pricing[].unitLabel`. So the rate is shown
+ * without a unit rather than under an invented one.
+ *
+ * `pricing.image` is deliberately ignored for the same reason: it reads as a
+ * flat per-image price on bytedance-seed/seedream-5-0-pro ($0.003) and as
+ * something else entirely on google/gemini-3-pro-image ($0.000002, against a
+ * real price around $0.13 an image).
+ */
+function priceFromModelEntry(
+  pricing: Record<string, string> | undefined,
+  modelId = '',
+  contextLength = 0,
+): PriceModel {
   const num = (v: string | undefined) => {
     const n = Number(v);
     return Number.isFinite(n) && n > 0 ? n : undefined;
@@ -302,6 +326,9 @@ function priceFromModelEntry(pricing: Record<string, string> | undefined, modelI
     perImageToken: num(pricing?.image_output),
     perAudioInputToken: num(pricing?.audio),
     perAudioOutputToken: num(pricing?.audio_output),
+    // Image-token fields name their own unit, so they are per token whatever the
+    // context length says. Only prompt and completion need the gate.
+    tokenBilled: Number(contextLength) > 0,
     free: false,
   };
   // Free is a claim about billing, and the only thing that supports it is the
@@ -418,7 +445,9 @@ function videoPrice(skus: Record<string, string> | undefined): PriceModel {
     else if (sku.startsWith('duration_seconds_')) perVideoSecond[sku.slice('duration_seconds_'.length)] = n;
   }
   const known = Object.keys(perVideoSecond).length > 0;
-  return { perVideoSecond, free: false, unpublished: !known };
+  // Video SKUs name their unit in the key itself, so there is no token rate to
+  // qualify here.
+  return { perVideoSecond, free: false, unpublished: !known, tokenBilled: false };
 }
 
 function speechParams(entry: any): ParamSpec[] {
@@ -523,7 +552,7 @@ export async function fetchCatalog(key: string | null): Promise<Catalog> {
     return {
       ...baseModel({ ...entry, architecture: entry.architecture ?? priced?.architecture }),
       params,
-      price: priceFromModelEntry(priced?.pricing, entry.id),
+      price: priceFromModelEntry(priced?.pricing, entry.id, priced?.context_length),
       maxReferences,
       supportsFrameImages: false,
       isUpscaler: false,
@@ -546,7 +575,7 @@ export async function fetchCatalog(key: string | null): Promise<Catalog> {
     entries.map((entry: any) => ({
       ...baseModel(entry),
       params: params(entry),
-      price: priceFromModelEntry(entry.pricing, entry.id),
+      price: priceFromModelEntry(entry.pricing, entry.id, entry.context_length),
       maxReferences: 0,
       supportsFrameImages: false,
       isUpscaler: false,

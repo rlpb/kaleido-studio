@@ -42,6 +42,7 @@ async function load(entry, name) {
 
 const api = await load('electron/openrouter.ts', 'openrouter');
 const pricing = await load('src/lib/pricing.ts', 'pricing');
+const paramsLib = await load('src/lib/params.ts', 'params');
 
 console.log('\nOpenRouter catalog');
 const catalog = await api.fetchCatalog(null);
@@ -214,6 +215,69 @@ await check('a rate keeps its magnitude', () => {
   }
 });
 
+await check('a rate is called per token only when the model bills per token', () => {
+  // pricing.prompt carries two different units and the catalog names neither.
+  // openai/gpt-4o-mini-transcribe declares a 128000-token context and lists
+  // 0.00000125, which is OpenAI's published $1.25 per million tokens.
+  // microsoft/mai-transcribe-2 declares no context and lists 0.1, which
+  // OpenRouter's own model page labels "Audio Hours ... /hour". Reading the
+  // second as a token rate displayed $0.10 per hour of audio as $100000 per
+  // million tokens.
+  const t = (key, vars = {}) =>
+    ({
+      'picker.perMillionTokens': '{rate} / M tokens',
+      'picker.rateNoUnit': '{rate} / unit',
+      'picker.free': 'free',
+      'picker.priceUnpublished': 'price not published',
+    })[key].replace(/\{(\w+)\}/g, (w, n) => (n in vars ? String(vars[n]) : w));
+
+  let unnamed = 0;
+  for (const mode of ['transcribe', 'speech']) {
+    for (const model of catalog.models[mode]) {
+      const summary = pricing.priceSummary(model, t);
+      if (model.price.tokenBilled) continue;
+      unnamed += 1;
+      assert.ok(
+        !summary.includes('M tokens'),
+        `${model.id} bills in an unnamed unit but its price reads "${summary}"`,
+      );
+    }
+  }
+  assert.ok(unnamed > 0, 'no model exercised the unnamed-unit path, so this check proved nothing');
+
+  const mai = catalog.models.transcribe.find((m) => m.id === 'microsoft/mai-transcribe-2');
+  if (mai) {
+    assert.equal(mai.price.tokenBilled, false, 'a model with no token context was marked as token billed');
+    assert.equal(pricing.priceSummary(mai, t), '$0.1 / unit');
+  }
+  console.log(`       ${unnamed} model(s) priced in a unit the catalog does not name`);
+});
+
+await check('a duration reads correctly at every scale', () => {
+  // Chosen by input class rather than by whatever a run happened to produce:
+  // under ten seconds, over ten, exactly a minute, and the rounding boundary
+  // that would otherwise print "1m 60s".
+  const cases = [
+    [0, '0.0s'],
+    [340, '0.3s'],
+    [3400, '3.4s'],
+    [9950, '9.9s'],
+    [10000, '10s'],
+    [12000, '12s'],
+    [59600, '1m'],
+    [60000, '1m'],
+    [61000, '1m 1s'],
+    [119600, '2m'],
+    [125000, '2m 5s'],
+    [3600000, '60m'],
+  ];
+  for (const [ms, expected] of cases) {
+    assert.equal(pricing.formatDuration(ms), expected, `${ms}ms rendered as "${pricing.formatDuration(ms)}"`);
+  }
+  assert.equal(pricing.formatDuration(undefined), '—');
+  assert.equal(pricing.formatDuration(-1), '—');
+});
+
 await check('a zero cost reads in the chosen language', () => {
   const t = (key) => (key === 'cost.free' ? 'gratis' : key);
   assert.equal(pricing.formatCost(0, t), 'gratis');
@@ -222,6 +286,32 @@ await check('a zero cost reads in the chosen language', () => {
   assert.equal(pricing.formatCost(0), '0');
   assert.equal(pricing.formatCost(0.5), '$0.5');
   assert.equal(pricing.formatCost(1.5), '$1.50');
+});
+
+await check('a knob put back where it started stops counting as changed', () => {
+  // The badge on the collapsed parameter panel is a claim about the user's own
+  // input, so it has to be reversible. It was not: a slider on a model that
+  // declares no default rests at its minimum and a checkbox rests unticked, but
+  // both were compared against the declared default, which is undefined. Moving
+  // one and putting it back left a badge nothing could clear.
+  const model = {
+    params: [
+      { key: 'creativity', label: 'Creativity', kind: 'number', min: 0, max: 10, step: 1 },
+      { key: 'quality', label: 'Quality', kind: 'enum', values: ['low', 'high'], default: 'high' },
+      { key: 'generate_audio', label: 'Audio', kind: 'bool' },
+      { key: 'seed', label: 'Seed', kind: 'int', min: 0, max: 99 },
+    ],
+  };
+  const count = (values) => paramsLib.countChanged(model, values);
+
+  assert.equal(count({}), 0, 'an untouched form reported a change');
+  assert.equal(count({ creativity: 0 }), 0, 'a slider returned to its minimum still counted');
+  assert.equal(count({ generate_audio: false }), 0, 'a checkbox ticked and unticked still counted');
+  assert.equal(count({ quality: 'high' }), 0, 'a select returned to its default still counted');
+  assert.equal(count({ creativity: 4 }), 1);
+  assert.equal(count({ quality: 'low', seed: 7 }), 2);
+  // A key left behind by a previously selected model must not be counted.
+  assert.equal(count({ resolution: '4K' }), 0, 'a key from another model inflated the count');
 });
 
 console.log('\nHTTP client');
