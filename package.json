@@ -25,7 +25,8 @@
     "check": "node scripts/selfcheck.mjs",
     "test": "node scripts/selfcheck.mjs",
     "icon": "node scripts/make-icon.mjs",
-    "check:config": "node scripts/validate-builder-config.mjs"
+    "check:config": "node scripts/validate-builder-config.mjs",
+    "social": "electron scripts/make-social-preview.mjs"
   },
   "dependencies": {
     "react": "^19.2.8",
