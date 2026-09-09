@@ -6,22 +6,36 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.5.2] - 2026-09-09
+
+### Changed
+
+- **Edit images lists only models that edit.** 1.5.1 sorted them to the top and
+  warned about the rest, which still left a model you must not pick on screen.
+  Accepting a reference image and editing one are different capabilities and the
+  catalog has no flag separating them: krea/krea-2-medium-turbo takes one
+  reference and describes itself as image generation, so asked to turn a cat
+  into a dog it returned a photograph of a dog with no relation to the drawing,
+  at full price, with no error anywhere. 29 of the 52 image models remain.
+
+  Neither available signal is enough alone, and both fail in a different
+  direction, so both are read: the vendor description, and whether an endpoint
+  bills `input_image` for a picture the model consumes rather than
+  `input_reference` for one it only looks at. Six models say they edit without
+  billing the first, and eight bill it without saying so, openai/gpt-5-image,
+  openai/gpt-image-1-mini and google/gemini-2.5-flash-image among them.
+  Description alone drops those three; billing alone drops flux.2-pro and
+  gemini-3.1-flash-image, which charge a flat per-image price.
+
+  The endpoint records cost one request per model, so only the models the
+  description leaves undecided are looked up, 30 of 52 today, in parallel, on a
+  catalog cached for thirty minutes. Expect a second or two more on the first
+  load.
+
 ## [1.5.1] - 2026-09-09
 
 ### Fixed
 
-- **Edit images listed models that cannot edit.** Accepting a reference image
-  and editing one are different capabilities, and the catalog has no flag
-  separating them: krea/krea-2-medium-turbo takes one reference and describes
-  itself as image generation, so asked to turn a cat into a dog it returned a
-  photograph of a dog with no relation to the drawing, at full price, with no
-  error anywhere. The mode now lists only models that do edit, 29 of the 52.
-  Neither available signal is enough alone, so both are read: the vendor
-  description, and whether an endpoint bills `input_image` for a picture it
-  consumes rather than `input_reference` for one it only takes as a style hint.
-  Six models say they edit without billing the first, and eight bill it without
-  saying so, openai/gpt-5-image and google/gemini-2.5-flash-image among them, so
-  either signal used on its own drops real editors or keeps false ones.
 - **Reference thumbnails never loaded.** The kal:// handler served only files
   inside the library folder, and reference images live wherever the user keeps
   them, so every tile got a 403 and rendered the filename from the img alt text
@@ -325,7 +339,8 @@ First release.
   cost and disk usage.
 - Installers for Windows, macOS and Linux, built by CI.
 
-[Unreleased]: https://github.com/rlpb/kaleido-studio/compare/v1.5.1...HEAD
+[Unreleased]: https://github.com/rlpb/kaleido-studio/compare/v1.5.2...HEAD
+[1.5.2]: https://github.com/rlpb/kaleido-studio/compare/v1.5.1...v1.5.2
 [1.5.1]: https://github.com/rlpb/kaleido-studio/compare/v1.5.0...v1.5.1
 [1.5.0]: https://github.com/rlpb/kaleido-studio/compare/v1.4.1...v1.5.0
 [1.4.1]: https://github.com/rlpb/kaleido-studio/compare/v1.4.0...v1.4.1

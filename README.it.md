@@ -62,6 +62,15 @@ preferiti, tema chiaro e scuro, e sette lingue di interfaccia. Ogni generazione
 viene cronometrata dal momento in cui la richiesta parte, così l'attesa che un
 modello costa si legge accanto al prezzo che costa.
 
+**In "modifica immagini" compaiono solo i modelli che modificano davvero.**
+Accettare un'immagine di riferimento e modificarla sono due capacità diverse, e
+il catalogo non ha un campo che le separi: alcuni modelli usano l'immagine come
+suggerimento di stile e restituiscono qualcosa che non c'entra, a prezzo pieno e
+senza errori. Per distinguerli si leggono due segnali, perché presi da soli
+falliscono entrambi: la descrizione del fornitore, e se un endpoint fattura
+`input_image` per un'immagine che il modello consuma invece di `input_reference`
+per una che si limita a guardare.
+
 ## L'idea su cui è costruito
 
 Per ogni endpoint OpenRouter pubblica i parametri che ciascun modello accetta,

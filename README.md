@@ -60,6 +60,14 @@ light themes, and seven interface languages. Every run is timed from the moment
 the request goes out, so the wait a model costs you is visible next to the price
 it costs you.
 
+**Edit images lists only models that edit.** Accepting a reference image and
+editing one are different capabilities, and the catalog has no flag separating
+them: some models take a single image as a style hint and return something
+unrelated to it, at full price, with no error. Two signals are read to tell them
+apart, because each one fails on its own: the vendor description, and whether an
+endpoint bills `input_image` for a picture the model consumes rather than
+`input_reference` for one it only looks at.
+
 ## The idea it is built on
 
 For every endpoint, OpenRouter publishes the parameters each model accepts,
