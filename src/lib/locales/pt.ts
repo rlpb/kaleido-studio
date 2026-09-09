@@ -80,8 +80,6 @@ const pt: Dict = {
   'studio.clearHistoryConfirm': 'Apagar todos os {n} prompts guardados? Não é possível desfazer.',
   'studio.modelParameters': 'Parâmetros do modelo',
   'studio.noParameters': 'Este modelo não expõe parâmetros. Bastam o prompt e as entradas.',
-  'studio.mayNotEdit':
-    'Este modelo aceita {n} imagem de referência e a sua própria descrição apresenta-o como geração, não edição. Pode devolver uma imagem nova em vez da sua alterada. Os modelos que declaram editar estão no topo da lista.',
   'studio.paramsCount': '{n} parâmetros',
   'studio.paramsChanged': '{n} alterados',
   'card.generationTime': 'Tempo de geração',

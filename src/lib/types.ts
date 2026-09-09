@@ -87,11 +87,12 @@ export interface ModelInfo {
   /** Max reference images accepted, 0 when the model cannot take any. */
   maxReferences: number;
   /**
-   * Whether the vendor description says the model edits images. The catalog has
-   * no flag for it, and accepting a reference image is not the same capability:
-   * a generator uses it as a style hint and returns something unrelated.
+   * Whether the model edits the image you supply, rather than taking it as a
+   * style hint and generating something new. The catalog has no flag for it, so
+   * this combines the two statements it does make: the vendor description, and
+   * whether any endpoint bills `input_image` rather than `input_reference`.
    */
-  claimsEditing: boolean;
+  editsImages: boolean;
   supportsFrameImages: boolean;
   isUpscaler: boolean;
 }
