@@ -29,6 +29,10 @@ jobs:
       - name: TypeScript, strict
         run: npm run typecheck
 
+      # Nothing known-vulnerable in what a user ends up running.
+      - name: Audit the dependencies
+        run: npm audit --omit=dev --audit-level=high
+
       # electron-builder validates its config as the first step of a packaging
       # run, so an unknown key otherwise fails all three platform jobs minutes
       # in, with a message naming the section but never the key.
@@ -76,3 +80,12 @@ jobs:
             release/*.deb
           if-no-files-found: error
           retention-days: 14
+
+  # The scans that every repository of mine runs, kept in one callable file so
+  # that improving one of them is a single edit copied across the three rather
+  # than six edits that drift. release.yml calls the same one.
+  guards:
+    uses: ./.github/workflows/guards.yml
+    with:
+      # The interface ships its strings in five languages by design.
+      language-excludes: "--exclude-dir=locales"

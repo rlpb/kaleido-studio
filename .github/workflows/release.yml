@@ -20,6 +20,15 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # The same scans the push workflow runs, on the commit about to be published.
+  # A gate that publishes has to clear the bar the gate that does not already
+  # clears, or the bar is decorative.
+  guards:
+    uses: ./.github/workflows/guards.yml
+    with:
+      ref: ${{ github.event.inputs.tag || github.ref_name }}
+      language-excludes: "--exclude-dir=locales"
+
   verify:
     name: types, config and live API
     runs-on: ubuntu-latest
@@ -50,7 +59,7 @@ jobs:
 
   package:
     name: package (${{ matrix.os }})
-    needs: verify
+    needs: [verify, guards]
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -122,20 +131,20 @@ jobs:
             found && /^## \[/ { exit }
             found { print }
           ' CHANGELOG.md)
+          # No fallback. Generated notes are a list of commit subjects, which
+          # tells a reader what was typed and never what changed for them, and a
+          # release that quietly shipped them would look finished either way.
           if [ -z "$(echo "$body" | tr -d '[:space:]')" ]; then
-            echo "::warning::CHANGELOG.md has no section for $version, falling back to generated notes"
-            echo "generated=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "generated=false" >> "$GITHUB_OUTPUT"
-            { echo 'body<<KALEIDO_EOF'; echo "$body"; echo 'KALEIDO_EOF'; } >> "$GITHUB_OUTPUT"
+            echo "::error::CHANGELOG.md has nothing under a heading for $version"
+            exit 1
           fi
+          { echo 'body<<KALEIDO_EOF'; echo "$body"; echo 'KALEIDO_EOF'; } >> "$GITHUB_OUTPUT"
 
       - uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ env.TAG }}
           name: Kaleido Studio ${{ env.TAG }}
           body: ${{ steps.notes.outputs.body }}
-          generate_release_notes: ${{ steps.notes.outputs.generated == 'true' }}
           files: |
             artifacts/**/*
             checksums/SHA256SUMS.txt
