@@ -36,7 +36,7 @@ permissions:
 
 jobs:
   guards:
-    name: No keys, no personal paths, English only
+    name: No keys, no personal paths, English only, one identity
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -160,6 +160,38 @@ jobs:
           fi
           if [ "$rc" -ne 1 ]; then
             echo "::error::grep failed with status $rc, so it did not answer the question"
+            exit 1
+          fi
+          echo "clean"
+
+      - name: Every commit and tag carries only the project identity
+        shell: bash
+        run: |
+          # Commit authors, committers and tag signers are metadata, so none of the scans
+          # above can see them, and once public they only come out by rewriting history.
+          allowed='^(rlpb <[0-9]+\+rlpb@users\.noreply\.github\.com>|dependabot\[bot\] <[0-9]+\+dependabot\[bot\]@users\.noreply\.github\.com>|github-actions\[bot\] <[0-9]+\+github-actions\[bot\]@users\.noreply\.github\.com>|GitHub <noreply@github\.com>)$'
+
+          # The filter has to refuse a stranger and accept the project identity, or an
+          # empty result below proves nothing.
+          if ! printf 'Someone Real <someone@example.com>\n' | grep -vqE "$allowed"; then
+            echo "::error::the identity filter accepted a stranger"
+            exit 1
+          fi
+          if printf 'rlpb <179169446+rlpb@users.noreply.github.com>\n' | grep -vqE "$allowed"; then
+            echo "::error::the identity filter rejected the project identity"
+            exit 1
+          fi
+          echo "positive and negative controls behaved"
+
+          rc=0
+          offenders=$( { git log --all --format='%an <%ae>%n%cn <%ce>'; git for-each-ref refs/tags --format='%(taggername) %(taggeremail)'; } | grep -v '^ *$' | sort -u | grep -vE "$allowed" ) || rc=$?
+          if [ "$rc" -eq 0 ]; then
+            echo "::error::an identity other than the project's is in the history:"
+            echo "$offenders"
+            exit 1
+          fi
+          if [ "$rc" -ne 1 ]; then
+            echo "::error::the history scan failed with status $rc, so it did not answer the question"
             exit 1
           fi
           echo "clean"
