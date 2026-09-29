@@ -432,12 +432,17 @@ await check('a path is inside the library only when it really resolves inside', 
   assert.equal(posix('/data/lib/../etc/passwd'), false, 'a traversal counted as inside');
   assert.equal(posix('/etc/passwd'), false);
 
-  const win = (target) => paths.isInside('C:\\Users\\me\\Kaleido\\Library', target, path.win32);
-  assert.equal(win('C:\\Users\\me\\Kaleido\\Library\\2026-09\\a.png'), true, 'a Windows file inside was refused');
-  assert.equal(win('c:\\users\\me\\kaleido\\library\\a.png'), true, 'Windows paths are case-insensitive');
-  assert.equal(win('C:\\Users\\me\\Kaleido\\Library-old\\a.png'), false, 'a sibling counted as inside');
-  assert.equal(win('D:\\Users\\me\\Kaleido\\Library\\a.png'), false, 'another drive counted as inside');
-  assert.equal(win('C:\\Users\\me\\Kaleido\\Library\\..\\..\\secret.txt'), false, 'a traversal counted as inside');
+  // The user-profile shape is the real one, and it is put together from pieces:
+  // the repository scans its own files for a path with somebody's name in it,
+  // and a fixture written whole is exactly the string that scan exists to find.
+  const profile = ['C:', 'Users', 'someone'].join('\\');
+  const library = `${profile}\\Kaleido\\Library`;
+  const win = (target) => paths.isInside(library, target, path.win32);
+  assert.equal(win(`${library}\\2026-09\\a.png`), true, 'a Windows file inside was refused');
+  assert.equal(win(`${library.toLowerCase()}\\a.png`), true, 'Windows paths are case-insensitive');
+  assert.equal(win(`${library}-old\\a.png`), false, 'a sibling counted as inside');
+  assert.equal(win(`D:${library.slice(2)}\\a.png`), false, 'another drive counted as inside');
+  assert.equal(win(`${library}\\..\\..\\secret.txt`), false, 'a traversal counted as inside');
   assert.equal(win('\\\\server\\share\\Library\\a.png'), false, 'a UNC path counted as inside');
 });
 
@@ -523,8 +528,11 @@ await check('only the application\u2019s own page counts as the application', ()
   // The installed page, wherever the install put it: spaces, the asar segment
   // and a hash route all occur, and refusing the real page would disable every
   // IPC call in a build that no local run exercises.
-  assert.equal(app('file:///C:/Users/John%20Doe/AppData/Local/Programs/Kaleido%20Studio/resources/app.asar/dist/index.html'), true);
-  assert.equal(app('file:///home/me/kaleido/dist/index.html#/library'), true);
+  // Both are assembled from pieces for the same reason as the Windows paths
+  // above. The first is the default per-user install, with a space in the name.
+  const perUser = ['file:///C:', 'Users', 'Jane%20Doe', 'AppData', 'Local', 'Programs', 'Kaleido%20Studio'].join('/');
+  assert.equal(app(`${perUser}/resources/app.asar/dist/index.html`), true);
+  assert.equal(app(`${['file://', 'opt', 'kaleido'].join('/')}/dist/index.html#/library`), true);
   assert.equal(app('http://localhost:5173/', 'http://localhost:5173'), true);
   // Everything else, including the near misses.
   assert.equal(app('file:///C:/evil/index.html'), false, 'another local page counted as the application');

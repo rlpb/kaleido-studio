@@ -20,7 +20,7 @@
  */
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import net from 'node:net';
 import { tmpdir } from 'node:os';
@@ -254,8 +254,12 @@ try {
   // Before anything can write, be sure the profile is the throwaway one.
   const info = await app.ipc('kaleido.app.info()');
   assert.ok(info.ok, `the bridge did not answer: ${info.message}`);
-  const reported = path.resolve(info.value.userData).toLowerCase();
-  if (reported !== path.resolve(profile).toLowerCase()) {
+  // Compared as real paths: on macOS the temp directory is reached through /var,
+  // which is an alias of /private/var, so the same folder has two spellings and a
+  // textual comparison refuses a run that is in fact isolated.
+  const real = (folder) => (process.platform === 'linux' ? realpathSync(folder) : realpathSync(folder).toLowerCase());
+  const reported = real(info.value.userData);
+  if (reported !== real(profile)) {
     console.error(`REFUSING TO CONTINUE: the app reports ${info.value.userData}, not ${profile}`);
     app.stop();
     process.exit(2);
