@@ -26,6 +26,8 @@
     "test": "node scripts/selfcheck.mjs",
     "icon": "node scripts/make-icon.mjs",
     "check:config": "node scripts/validate-builder-config.mjs",
+    "smoke": "node scripts/app-smoke.mjs",
+    "smoke:packaged": "node scripts/app-smoke.mjs --packaged release",
     "social": "electron scripts/make-social-preview.mjs"
   },
   "dependencies": {
@@ -39,7 +41,7 @@
     "@vitejs/plugin-react": "^6.1.1",
     "concurrently": "^10.0.5",
     "cross-env": "^10.1.0",
-    "electron": "^44.2.0",
+    "electron": "^44.4.5",
     "electron-builder": "^26.15.3",
     "esbuild": "^0.28.2",
     "typescript": "^7.0.2",
