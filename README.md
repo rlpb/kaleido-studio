@@ -204,17 +204,23 @@ on first launch. What replaces a signature is two checks you can run yourself.
 
 Every installer carries a signed build-provenance attestation: which repository,
 which workflow and which commit produced these exact bytes. It is verified
-against GitHub, without trusting anything on the release page:
+against GitHub, without trusting anything on the release page. The command
+succeeds only for a file this repository's release workflow built, and exits
+with an error for anything else, including the same file with one byte changed:
 
 ```bash
-gh attestation verify "Kaleido.Studio-<version>-x64.exe" --repo rlpb/kaleido-studio
+gh attestation verify Kaleido.Studio-<version>-x64.exe --repo rlpb/kaleido-studio
 ```
 
-And every release lists a SHA-256 checksum for each installer:
+And every release lists a SHA-256 checksum for each installer, under the names
+the files have once downloaded. Run this in the folder you downloaded them to:
 
 ```bash
 sha256sum -c SHA256SUMS.txt --ignore-missing
 ```
+
+The release workflow runs both of these against the published files before it
+lets the release stand, and takes it back to a draft if either fails.
 
 You need an [OpenRouter API key](https://openrouter.ai/keys). Paste it on first
 launch and nothing else is asked.

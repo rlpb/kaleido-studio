@@ -216,17 +216,24 @@ una firma ci sono due verifiche che puoi eseguire da solo.
 
 Ogni installer porta un'attestazione di provenienza firmata: quale repository,
 quale workflow e quale commit hanno prodotto quei byte esatti. Si verifica
-contro GitHub, senza fidarsi di niente che stia nella pagina della release:
+contro GitHub, senza fidarsi di niente che stia nella pagina della release. Il
+comando ha successo solo per un file costruito dal workflow di release di questo
+repository, e termina con un errore per qualunque altra cosa, compreso lo stesso
+file con un byte cambiato:
 
 ```bash
-gh attestation verify "Kaleido.Studio-<versione>-x64.exe" --repo rlpb/kaleido-studio
+gh attestation verify Kaleido.Studio-<versione>-x64.exe --repo rlpb/kaleido-studio
 ```
 
-E ogni release elenca un checksum SHA-256 per ciascun installer:
+E ogni release elenca un checksum SHA-256 per ciascun installer, coi nomi che i
+file hanno una volta scaricati. Eseguilo nella cartella dove li hai scaricati:
 
 ```bash
 sha256sum -c SHA256SUMS.txt --ignore-missing
 ```
+
+Il workflow di release esegue entrambi i comandi sui file pubblicati prima di
+lasciare in piedi la release, e la riporta in bozza se uno dei due fallisce.
 
 Serve una [chiave API OpenRouter](https://openrouter.ai/keys). La incolli al
 primo avvio e non viene chiesto altro.

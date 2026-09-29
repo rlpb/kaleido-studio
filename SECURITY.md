@@ -17,16 +17,18 @@ Release binaries are not code-signed, so Windows SmartScreen and macOS Gatekeepe
 **Where it was built.** Every installer carries a build-provenance attestation, signed with a short-lived certificate GitHub issues to the workflow run that made it. It states which repository, which workflow and which commit produced the exact bytes you have:
 
 ```bash
-gh attestation verify "Kaleido.Studio-<version>-x64.exe" --repo rlpb/kaleido-studio
+gh attestation verify Kaleido.Studio-<version>-x64.exe --repo rlpb/kaleido-studio
 ```
 
-**That the file is intact.** Each release also lists a SHA-256 checksum for every installer in `SHA256SUMS.txt`:
+The command exits with an error for a file this repository's release workflow did not build, including the same file with one byte changed. It prints nothing when its output is not a terminal, so check the exit status.
+
+**That the file is intact.** Each release also lists a SHA-256 checksum for every installer in `SHA256SUMS.txt`, under the names the files have once downloaded. Run it in the folder they are in:
 
 ```bash
 sha256sum -c SHA256SUMS.txt --ignore-missing
 ```
 
-Installers are built only by the release workflow, from a tagged commit, and never on a developer machine. The workflow refuses to publish unless the fuse settings below hold in the built binary and the packaged application starts and passes its own checks on Windows, macOS and Linux.
+Installers are built only by the release workflow, from a tagged commit, and never on a developer machine. The workflow refuses to build a release unless the fuse settings below hold in the built binary and the packaged application starts and passes its own checks on Windows, macOS and Linux. After publishing, it runs both commands above on the files as GitHub serves them, and takes the release back to a draft if either fails.
 
 ## What this app does with your credentials
 

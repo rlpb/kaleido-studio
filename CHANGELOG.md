@@ -6,6 +6,31 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.6.1] - 2026-09-29
+
+### Fixed
+
+- **The checksum command in the README verified nothing.** `SHA256SUMS.txt`
+  listed the installers under the names electron-builder gave them, with a space
+  in "Kaleido Studio", and GitHub replaces the spaces in an asset name with dots.
+  So `sha256sum -c SHA256SUMS.txt --ignore-missing` found no file to check and
+  ended with `no file was verified`. The file now uses the names as they appear
+  on the release page. The published checksum files of 1.5.1, 1.5.2 and 1.6.0
+  were corrected in place; only the names changed, never a hash.
+
+### Changed
+
+- **A release is verified the way a user would verify it, before it is allowed to
+  stand.** After publishing, the workflow downloads the files from GitHub and runs
+  the checksum command with no `--ignore-missing`, checks that the file lists
+  exactly the installers that were published, and runs `gh attestation verify`
+  on every one. If any of it fails the release goes back to a draft. The defect
+  above was found by running the documented commands on a real download, which
+  the workflow had never done.
+- The README and SECURITY.md describe the verification commands as they behave:
+  the download has dots in its name, and `gh attestation verify` reports through
+  its exit status and prints nothing when not attached to a terminal.
+
 ## [1.6.0] - 2026-09-29
 
 A pass over what happens when the interface, the disk or the network misbehave,
@@ -413,7 +438,8 @@ First release.
   cost and disk usage.
 - Installers for Windows, macOS and Linux, built by CI.
 
-[Unreleased]: https://github.com/rlpb/kaleido-studio/compare/v1.6.0...HEAD
+[Unreleased]: https://github.com/rlpb/kaleido-studio/compare/v1.6.1...HEAD
+[1.6.1]: https://github.com/rlpb/kaleido-studio/compare/v1.6.0...v1.6.1
 [1.6.0]: https://github.com/rlpb/kaleido-studio/compare/v1.5.2...v1.6.0
 [1.5.2]: https://github.com/rlpb/kaleido-studio/compare/v1.5.1...v1.5.2
 [1.5.1]: https://github.com/rlpb/kaleido-studio/compare/v1.5.0...v1.5.1

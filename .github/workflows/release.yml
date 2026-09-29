@@ -132,12 +132,20 @@ jobs:
       # Published alongside the installers so anyone downloading one can check
       # they got the file this workflow produced, and not something a mirror or
       # a hijacked link handed them instead.
+      #
+      # The names are the ones the files have on the release page, not the ones
+      # electron-builder gave them. GitHub replaces the spaces in an asset name
+      # with dots, so a checksum file that kept "Kaleido Studio-1.6.0-x64.exe"
+      # matched nothing anyone could download, and `sha256sum -c --ignore-missing`
+      # then verified nothing while looking busy.
       - name: Checksums
+        shell: bash
         run: |
           mkdir -p checksums
-          find artifacts -type f -exec sha256sum {} + \
-            | sed 's|artifacts/[^/]*/||' \
-            | sort -k2 > checksums/SHA256SUMS.txt
+          : > checksums/SHA256SUMS.txt
+          find artifacts -type f | sort | while IFS= read -r file; do
+            printf '%s  %s\n' "$(sha256sum "$file" | cut -d' ' -f1)" "$(basename "$file" | tr ' ' '.')" >> checksums/SHA256SUMS.txt
+          done
           cat checksums/SHA256SUMS.txt
 
       - name: Notes from the changelog
@@ -178,6 +186,7 @@ jobs:
       # this step holds a token that can write to the repository and is handed
       # every installer, which is a poor place for code nobody here reviews.
       - name: Publish the release
+        id: publish
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -192,3 +201,44 @@ jobs:
           else
             gh release create "$TAG" --title "$title" --notes-file notes.md --verify-tag "${files[@]}"
           fi
+
+      # Does to the published files exactly what the README tells a user to do,
+      # and nothing more forgiving. The checksum command has no --ignore-missing,
+      # so a name in SHA256SUMS.txt that matches no asset fails it, which is the
+      # bug this step exists for. The attestation is retried, because it takes a
+      # few seconds to become visible after it is created.
+      - name: Verify what a user will download
+        id: verify
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir verify && cd verify
+          gh release download "$TAG" --pattern '*'
+          sha256sum -c SHA256SUMS.txt
+          listed=$(wc -l < SHA256SUMS.txt)
+          present=$(find . -maxdepth 1 -type f ! -name SHA256SUMS.txt | wc -l)
+          if [ "$listed" -ne "$present" ] || [ "$listed" -eq 0 ]; then
+            echo "::error::SHA256SUMS.txt lists $listed files and the release has $present installers"
+            exit 1
+          fi
+          for file in $(find . -maxdepth 1 -type f ! -name SHA256SUMS.txt | sort); do
+            ok=0
+            for attempt in 1 2 3 4 5 6; do
+              if gh attestation verify "$file" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then ok=1; break; fi
+              sleep 10
+            done
+            if [ "$ok" -ne 1 ]; then
+              echo "::error::no valid attestation for $file"
+              exit 1
+            fi
+            echo "verified $file"
+          done
+
+      # A release that fails its own verification should not stay public.
+      - name: Take the release back to a draft if it did not verify
+        if: failure() && steps.verify.outcome == 'failure'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release edit "$TAG" --draft
