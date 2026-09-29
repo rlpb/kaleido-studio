@@ -136,7 +136,7 @@ export default function MediaViewer({ items, index, onIndex, onClose, push }: Pr
   const transform = `translate(${offset.x}px, ${offset.y}px) scale(${zoom})`;
 
   return (
-    <div className="viewer">
+    <div className="viewer" role="dialog" aria-modal="true" aria-label={item.modelName}>
       <div className="viewer-head" onPointerDown={(e) => e.stopPropagation()}>
         <div className="viewer-title">
           <strong>{item.modelName}</strong>

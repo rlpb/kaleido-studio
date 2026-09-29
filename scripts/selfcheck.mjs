@@ -62,6 +62,51 @@ await check('every mode has at least one model', () => {
   console.log('       ' + modes.map((m) => `${m}=${catalog.models[m].length}`).join(' '));
 });
 
+await check('descriptions reach the interface as plain text, not as Markdown', () => {
+  // The catalog writes descriptions in Markdown and the picker prints them as
+  // they come, so a link showed up as "[GPT-5.4](https://...)" beside the model.
+  // Cases first, chosen by class: a whole link, a relative one, one the catalog
+  // cut off mid-address, bold, code, and ordinary text that must not change.
+  const cases = [
+    ['[GPT-5.4](https://openrouter.ai/openai/gpt-5.4) Image 2', 'GPT-5.4 Image 2'],
+    ['the faster [MAI-Image-2.6 Flash](/microsoft/mai-image-2.6-flash) tier', 'the faster MAI-Image-2.6 Flash tier'],
+    ['see [the docs](https://exam', 'see the docs'],
+    ['a **fast** and `cheap` model', 'a fast and cheap model'],
+    ['text_to_image at 1K (2 sizes) [beta]', 'text_to_image at 1K (2 sizes) [beta]'],
+  ];
+  for (const [input, expected] of cases) assert.equal(api.plainText(input), expected, `"${input}" became "${api.plainText(input)}"`);
+
+  // And the live catalog, which is what actually failed.
+  const leftover = [];
+  for (const mode of modes) {
+    for (const model of catalog.models[mode]) if (/\]\(/.test(model.description)) leftover.push(model.id);
+  }
+  assert.deepEqual([...new Set(leftover)], [], `Markdown links reach the interface in: ${[...new Set(leftover)].join(', ')}`);
+});
+
+await check('a vendor is written the way the catalog writes it', () => {
+  // Capitalising the slug gave "Openai" and "Inclusionai". The name carries the
+  // brand with its own capitals, before the colon.
+  assert.equal(api.vendorOf('openai/gpt-image-2', 'OpenAI: GPT Image 2'), 'OpenAI');
+  assert.equal(api.vendorOf('inclusionai/ming', 'inclusionAI: Ming Image 0.1'), 'inclusionAI');
+  assert.equal(api.vendorOf('black-forest-labs/flux.2-pro', 'Black Forest Labs: FLUX.2 Pro'), 'Black Forest Labs');
+  // No prefix, or an implausible one: fall back to the slug rather than guess.
+  assert.equal(api.vendorOf('black-forest-labs/flux', 'FLUX'), 'Black Forest Labs');
+  assert.equal(api.vendorOf('acme/x', `${'a'.repeat(40)}: model`), 'Acme');
+
+  let checked = 0;
+  for (const mode of modes) {
+    for (const model of catalog.models[mode]) {
+      const prefix = model.name.includes(':') ? model.name.split(':')[0].trim() : null;
+      if (prefix && prefix.length <= 32) {
+        assert.equal(model.vendor, prefix, `${model.id}: vendor "${model.vendor}" but the name says "${prefix}"`);
+        checked += 1;
+      }
+    }
+  }
+  assert.ok(checked > 50, `only ${checked} models had a name prefix to compare, so this proved little`);
+});
+
 await check('every ParamSpec is usable by a form', () => {
   for (const mode of modes) {
     for (const model of catalog.models[mode]) {

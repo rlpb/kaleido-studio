@@ -6,6 +6,80 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-09-29
+
+A pass over what happens when the interface, the disk or the network misbehave,
+and over how far a download can be trusted. Most of it is invisible until the
+day it matters, which is the reason to do it before that day.
+
+### Security
+
+- **A file the interface names can no longer be run.** "Open in the default
+  app" handed a path from the interface straight to the operating system, which
+  runs whatever the file is. It is limited to media files inside the library.
+  That last part matters because the extension of a saved file came from the media
+  type the provider declared, falling back to its raw subtype: a response claiming
+  `application/bat` was saved as a `.bat` inside the library, one click from being
+  launched. The extension now comes from a fixed table and nowhere else.
+- **Reveal, copy and delete follow the same containment rule**, and a generation
+  reads a local file as input only if it was chosen through a file dialog, dropped
+  on the window, or already in the library. Before, the interface could name any
+  file on the disk and have it uploaded to a provider.
+- **Every IPC handler answers only the application's own page**, and the window
+  cannot navigate anywhere else, redirects included. It used to accept every
+  `file://` URL. Every browser permission is denied except copying to the
+  clipboard, where Chromium grants everything by default.
+- The settings call validates each field, and the library folder changes only
+  through the folder dialog. The content security policy gains `object-src`,
+  `base-uri` and `form-action`, which do not fall back to `default-src`.
+- **The packaged app is hardened with Electron fuses.** The executable no longer
+  works as a general Node interpreter, ignores `NODE_OPTIONS` and `--inspect`,
+  loads code only from `app.asar`, and refuses to start if a single byte of that
+  archive has changed. CI reads the fuses back out of the built binary.
+- **Every installer carries a signed build-provenance attestation**, checkable
+  against GitHub with `gh attestation verify`, next to the SHA-256 checksums.
+  The builds are still not code-signed; this is the strongest statement about
+  where a binary came from that they can carry.
+- The release workflow is read-only except in the job that publishes, and that
+  job no longer uses a third-party action: it holds a token that can write to the
+  repository and is handed every installer, so it uses the GitHub CLI already on
+  the runner.
+- Electron 44.2.0 to 44.4.5, which carries Chromium security fixes, and React,
+  Vite and the type packages within their ranges.
+
+### Fixed
+
+- **A damaged config or library index no longer costs you the data.** Both were
+  read with a catch that returned defaults, so a file that failed to parse was
+  treated as a first run and the next save replaced it: the encrypted API key,
+  presets and history, or the whole library index, gone after one truncated
+  write. A file that will not parse is now set aside under a name that says so,
+  and writes go through a temporary file and a rename.
+- **Model descriptions showed raw Markdown**, such as
+  `[GPT-5.4](https://openrouter.ai/openai/gpt-5.4)`, in the picker. The link text
+  stays and the address goes.
+- **Vendors read "Openai" and "Inclusionai".** The vendor is taken from the name
+  the catalog gives, "OpenAI: GPT Image 2", instead of a capitalised slug.
+- The model picker did not close with Esc, and the dialogs did not declare
+  themselves as dialogs to assistive technology. The sort and filter controls, and
+  the library path in Settings, had no accessible name.
+
+### Added
+
+- **The packaged app is started in CI on Windows, macOS and Linux**, and attacked:
+  opening a file outside the library, uploading one nobody chose, navigating the
+  window away and asking for the camera must all be refused. A build that
+  packages without error and does not start used to look like a green one.
+- **Every screen is drawn and inspected in seven languages and both themes**
+  against a stand-in backend that the compiler holds to the real bridge
+  interface. It fails on a string left untranslated or in the wrong language,
+  text cut off by its box, a control with no name, a dialog that will not close,
+  and any console error. The interface had no test before this.
+- Screenshots come from the page's own pixels and show no account balance. The
+  earlier ones were captured from the screen and showed a real balance and a
+  real list of favourite models.
+- A screenshot of the edit screen.
+
 ## [1.5.2] - 2026-09-09
 
 ### Changed
@@ -339,7 +413,8 @@ First release.
   cost and disk usage.
 - Installers for Windows, macOS and Linux, built by CI.
 
-[Unreleased]: https://github.com/rlpb/kaleido-studio/compare/v1.5.2...HEAD
+[Unreleased]: https://github.com/rlpb/kaleido-studio/compare/v1.6.0...HEAD
+[1.6.0]: https://github.com/rlpb/kaleido-studio/compare/v1.5.2...v1.6.0
 [1.5.2]: https://github.com/rlpb/kaleido-studio/compare/v1.5.1...v1.5.2
 [1.5.1]: https://github.com/rlpb/kaleido-studio/compare/v1.5.0...v1.5.1
 [1.5.0]: https://github.com/rlpb/kaleido-studio/compare/v1.4.1...v1.5.0

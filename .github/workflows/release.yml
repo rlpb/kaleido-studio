@@ -9,8 +9,9 @@ on:
         description: "Existing tag to build"
         required: true
 
+# Read-only by default. Only the job that publishes is granted more, below.
 permissions:
-  contents: write
+  contents: read
 
 env:
   TAG: ${{ github.event.inputs.tag || github.ref_name }}
@@ -112,6 +113,10 @@ jobs:
     name: publish the release
     needs: package
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # create the release and attach the files
+      id-token: write # mint the short-lived certificate the attestation is signed with
+      attestations: write # store the attestation next to the repository
     steps:
       - uses: actions/checkout@v7
         with:
@@ -136,31 +141,54 @@ jobs:
           cat checksums/SHA256SUMS.txt
 
       - name: Notes from the changelog
-        id: notes
         shell: bash
         run: |
           version="${TAG#v}"
           # Everything between this version's heading and the next one.
-          body=$(awk -v v="$version" '
+          awk -v v="$version" '
             $0 ~ "^## \\[" v "\\]" { found = 1; next }
             found && /^## \[/ { exit }
             found { print }
-          ' CHANGELOG.md)
+          ' CHANGELOG.md > notes.md
           # No fallback. Generated notes are a list of commit subjects, which
           # tells a reader what was typed and never what changed for them, and a
           # release that quietly shipped them would look finished either way.
-          if [ -z "$(echo "$body" | tr -d '[:space:]')" ]; then
+          if [ -z "$(tr -d '[:space:]' < notes.md)" ]; then
             echo "::error::CHANGELOG.md has nothing under a heading for $version"
             exit 1
           fi
-          { echo 'body<<KALEIDO_EOF'; echo "$body"; echo 'KALEIDO_EOF'; } >> "$GITHUB_OUTPUT"
 
-      - uses: softprops/action-gh-release@v3
+      # A checksum says the file is the one this workflow produced, to whoever
+      # trusts the checksum file. This says which workflow, in which repository, at
+      # which commit, signed by a certificate GitHub issued for that run, and it
+      # can be checked against GitHub without trusting anything in the release:
+      #   gh attestation verify <file> --repo rlpb/kaleido-studio
+      # The builds are unsigned by a code-signing certificate, so this is the
+      # strongest statement about where a binary came from that they can carry.
+      - name: Attest where the installers came from
+        uses: actions/attest@v4
         with:
-          tag_name: ${{ env.TAG }}
-          name: Kaleido Studio ${{ env.TAG }}
-          body: ${{ steps.notes.outputs.body }}
-          files: |
-            artifacts/**/*
-            checksums/SHA256SUMS.txt
-          fail_on_unmatched_files: true
+          subject-path: |
+            artifacts/**/*.exe
+            artifacts/**/*.dmg
+            artifacts/**/*.AppImage
+            artifacts/**/*.deb
+
+      # The GitHub CLI already on the runner, rather than a third-party action:
+      # this step holds a token that can write to the repository and is handed
+      # every installer, which is a poor place for code nobody here reviews.
+      - name: Publish the release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mapfile -t files < <(find artifacts -type f | sort)
+          files+=(checksums/SHA256SUMS.txt)
+          title="Kaleido Studio $TAG"
+          # A re-run of a failed publish finds the release already there.
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            gh release edit "$TAG" --title "$title" --notes-file notes.md
+            gh release upload "$TAG" "${files[@]}" --clobber
+          else
+            gh release create "$TAG" --title "$title" --notes-file notes.md --verify-tag "${files[@]}"
+          fi

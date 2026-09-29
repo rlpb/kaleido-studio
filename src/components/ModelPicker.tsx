@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { ModelInfo } from '../lib/types';
 import { cheapness, priceSummary } from '../lib/pricing';
 import Icon from './Icon';
@@ -21,6 +21,15 @@ export default function ModelPicker({ models, selectedId, favorites, onSelect, o
   const [sort, setSort] = useState<Sort>('newest');
   const [onlyFavorites, setOnlyFavorites] = useState(false);
 
+  // Esc closes it. A dialog that only a mouse can dismiss traps everyone else.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
   const visible = useMemo(() => {
     const needle = query.trim().toLowerCase();
     const filtered = models.filter((m) => {
@@ -42,7 +51,13 @@ export default function ModelPicker({ models, selectedId, favorites, onSelect, o
 
   return (
     <div className="overlay" onMouseDown={onClose}>
-      <div className="modal" onMouseDown={(e) => e.stopPropagation()}>
+      <div
+        className="modal"
+        role="dialog"
+        aria-modal="true"
+        aria-label={t('picker.title')}
+        onMouseDown={(e) => e.stopPropagation()}
+      >
         <div className="modal-head">
           <div className="spread">
             <strong>{t('picker.title')}</strong>
@@ -61,12 +76,13 @@ export default function ModelPicker({ models, selectedId, favorites, onSelect, o
               <input
                 type="search"
                 placeholder={t('picker.search')}
+                aria-label={t('picker.search')}
                 value={query}
                 autoFocus
                 onChange={(e) => setQuery(e.target.value)}
               />
             </div>
-            <select value={sort} onChange={(e) => setSort(e.target.value as Sort)}>
+            <select value={sort} aria-label={t('picker.sortBy')} onChange={(e) => setSort(e.target.value as Sort)}>
               <option value="newest">{t('picker.sortNewest')}</option>
               <option value="cheapest">{t('picker.sortCheapest')}</option>
               <option value="name">{t('picker.sortName')}</option>

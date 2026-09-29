@@ -16,5 +16,5 @@
     "noEmit": true,
     "types": ["node"]
   },
-  "include": ["src", "electron"]
+  "include": ["src", "electron", "scripts/ui"]
 }

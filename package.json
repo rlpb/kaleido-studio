@@ -1,6 +1,6 @@
 {
   "name": "kaleido-studio",
-  "version": "1.5.2",
+  "version": "1.6.0",
   "description": "Desktop studio for AI media generation on OpenRouter: images, image editing, video, speech and transcription in one app.",
   "private": true,
   "type": "module",
@@ -27,6 +27,8 @@
     "icon": "node scripts/make-icon.mjs",
     "check:config": "node scripts/validate-builder-config.mjs",
     "check:fuses": "node scripts/check-fuses.mjs",
+    "check:ui": "electron scripts/ui/harness.mjs smoke",
+    "shots": "electron scripts/ui/harness.mjs shots",
     "smoke": "node scripts/app-smoke.mjs",
     "smoke:packaged": "node scripts/app-smoke.mjs --packaged release",
     "social": "electron scripts/make-social-preview.mjs"

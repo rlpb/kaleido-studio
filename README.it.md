@@ -14,7 +14,7 @@ Immagini, video, voce e trascrizioni su OpenRouter, con i controlli generati dal
 [![Piattaforme](https://img.shields.io/badge/piattaforme-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)](#download)
 [![Ko-fi](https://img.shields.io/badge/Ko--fi-sostieni-FF5E5B?logo=kofi&logoColor=white)](https://ko-fi.com/rlpb_)
 
-[Download](#download) · [Come funziona](#come-avviene-una-generazione) · [Costi](#costi) · [Sicurezza](#sicurezza-della-chiave) · [FAQ](#faq) · [English](README.md)
+[Download](#download) · [Come funziona](#come-avviene-una-generazione) · [Costi](#costi) · [Sicurezza](#sicurezza) · [FAQ](#faq) · [English](README.md)
 
 </div>
 
@@ -70,6 +70,10 @@ senza errori. Per distinguerli si leggono due segnali, perché presi da soli
 falliscono entrambi: la descrizione del fornitore, e se un endpoint fattura
 `input_image` per un'immagine che il modello consuma invece di `input_reference`
 per una che si limita a guardare.
+
+<div align="center">
+<img src="docs/screenshot-edit.png" alt="La schermata di modifica, che elenca solo i modelli che modificano l'immagine ricevuta" width="900">
+</div>
 
 ## L'idea su cui è costruito
 
@@ -151,29 +155,47 @@ Nessuna rotta documentata pubblica quell'etichetta: `/api/v1/models`, la rotta
 `/endpoints` e `?include=display_pricing` la omettono tutte. Quindi Kaleido
 mostra quelle tariffe alla loro scala lasciando l'unità senza nome, invece di
 moltiplicarle per un milione e chiamare il risultato prezzo per token. Nel
-catalogo attuale sono trenta i modelli in questo caso, e un controllo fallisce se
+catalogo sono più di trenta i modelli in questo caso, e un controllo fallisce se
 uno di essi torna a essere etichettato come fatturato a token.
 
 
-## Sicurezza della chiave
+## Sicurezza
 
-La chiave viene cifrata con il portachiavi del sistema operativo tramite
+Un'app che custodisce una chiave API e scrive file deve poter essere verificata,
+quindi ecco cosa fa e come ogni affermazione viene tenuta a bada.
+
+**La chiave.** Viene cifrata con il portachiavi del sistema operativo tramite
 `safeStorage` di Electron: Gestione credenziali su Windows, Keychain su macOS,
 `libsecret` su Linux. Viene salvata nella cartella dati dell'applicazione e non
-lascia mai la macchina se non verso `openrouter.ai`.
+lascia mai la macchina se non verso `openrouter.ai`. Dove il portachiavi non è
+disponibile Electron degrada in silenzio; Kaleido registra il caso e lo dichiara
+nelle impostazioni con l'etichetta *salvata in chiaro*, invece di lasciar credere
+che sia cifrata. Nessuna telemetria, nessuna analitica, nessuna destinazione di
+rete oltre a OpenRouter.
 
-Dove il portachiavi non è disponibile, Electron non fallisce: degrada in
-silenzio. Kaleido registra il caso e lo dichiara nelle impostazioni con
-l'etichetta *salvata in chiaro*, invece di lasciar credere che sia cifrata.
+**L'interfaccia è trattata come non fidata.** Il renderer gira in sandbox, con
+`contextIsolation` e senza integrazione Node, e non riceve mai la chiave. Ogni
+handler IPC risponde solo alla pagina dell'applicazione. Un file viene aperto,
+mostrato o copiato solo dall'interno della cartella della libreria, una
+generazione legge un file locale solo se l'hai scelto tu, e l'estensione di un
+file salvato viene da una tabella fissa invece che dal tipo dichiarato dal
+fornitore. La finestra non può navigare altrove e ha negato ogni permesso del
+browser tranne gli appunti.
 
-Il renderer gira con `contextIsolation`, `sandbox` e senza integrazione Node.
-Non riceve mai la chiave e parla col processo principale solo tramite IPC
-tipizzato. I file della libreria gli arrivano da un protocollo custom che
-risolve il percorso richiesto e rifiuta qualunque cosa stia fuori dalla cartella
-della libreria.
+**I tuoi dati sopravvivono a una scrittura andata male.** La configurazione e
+l'indice della libreria vengono scritti passando da un file temporaneo e da un
+rinomina. Un file che non si riesce a leggere viene messo da parte con un nome che
+lo dice, invece di essere letto come vuoto e sovrascritto, che è come una sola
+scrittura troncata ti avrebbe altrimenti fatto perdere la chiave, i preset e
+l'intero indice della libreria.
 
-Nessuna telemetria, nessuna analitica, nessuna destinazione di rete oltre a
-OpenRouter.
+**La build è irrobustita e parte prima di essere pubblicata.** I fuse di Electron
+sono impostati in fase di build: l'eseguibile non può essere usato come
+interprete Node, non ci si può agganciare con `--inspect`, e si rifiuta di partire
+se anche un solo byte di `app.asar` è cambiato. La CI rilegge i fuse dal binario
+prodotto, poi avvia l'app impacchettata su Windows, macOS e Linux e la pilota,
+inviandole anche le richieste di cui sopra e verificando che vengano rifiutate.
+L'elenco completo, e come segnalare un problema, sta in [SECURITY.md](SECURITY.md).
 
 ## Download
 
@@ -188,12 +210,19 @@ Gli installer per Windows, macOS e Linux sono compilati dalla
 | macOS | `.dmg`, Intel e Apple silicon |
 | Linux | `.AppImage`, oppure `.deb` |
 
-Le build non sono firmate. Windows SmartScreen e Gatekeeper su macOS mostrano un
-avviso al primo avvio.
+Le build non sono firmate con un certificato di code signing, quindi Windows
+SmartScreen e Gatekeeper su macOS mostrano un avviso al primo avvio. Al posto di
+una firma ci sono due verifiche che puoi eseguire da solo.
 
-Ogni release porta un `SHA256SUMS.txt` prodotto dallo stesso workflow che ha
-costruito gli installer, così puoi verificare che il file scaricato sia quello
-che la CI ha creato:
+Ogni installer porta un'attestazione di provenienza firmata: quale repository,
+quale workflow e quale commit hanno prodotto quei byte esatti. Si verifica
+contro GitHub, senza fidarsi di niente che stia nella pagina della release:
+
+```bash
+gh attestation verify "Kaleido.Studio-<versione>-x64.exe" --repo rlpb/kaleido-studio
+```
+
+E ogni release elenca un checksum SHA-256 per ciascun installer:
 
 ```bash
 sha256sum -c SHA256SUMS.txt --ignore-missing
@@ -260,18 +289,26 @@ fornisce il catalogo.
 electron/
 ├── main.ts               finestra, IPC, protocollo media, menu
 ├── preload.ts            la superficie contextBridge che vede il renderer
+├── security.ts           quale pagina è l'app, controllo del mittente IPC, permessi
+├── paths.ts              "questo file sta davvero dentro quella cartella"
+├── atomic-json.ts        scritture atomiche, e un file rovinato messo da parte invece che letto come vuoto
+├── media-types.ts        la tabella che decide l'estensione di un file salvato
 ├── openrouter.ts         client API e normalizzazione delle capability
 ├── keepalive-request.ts  il percorso HTTPS che arriva a setKeepAlive
-├── jobs.ts               coda, costruzione richieste, polling video, salvataggio
+├── request-body.ts       il corpo che ogni endpoint si aspetta, costruito da un job
+├── jobs.ts               coda, polling video, salvataggio
 ├── store.ts              configurazione, chiave cifrata, preset, costi osservati
 └── library.ts            file su disco e indice della libreria
 src/
 ├── screens/              onboarding, studio, libreria, impostazioni
 ├── components/           selettore modelli, form generato, input, schede, viewer
-└── lib/                  tipi condivisi, definizione modalità, prezzi, i18n
+└── lib/                  tipi condivisi, definizione modalità, prezzi, parametri, i18n
 scripts/
-├── selfcheck.mjs               verifica contro l'API dal vivo
+├── selfcheck.mjs               logica e catalogo dal vivo, senza chiave
+├── app-smoke.mjs               avvia l'app vera e la pilota via DevTools
+├── check-fuses.mjs             legge i fuse di Electron dal binario prodotto
 ├── validate-builder-config.mjs valida offline la configurazione di packaging
+├── ui/                         il backend simulato, il controllo schermata per schermata, gli screenshot
 └── make-icon.mjs               genera l'icona, nessun binario nel repository
 ```
 
@@ -282,19 +319,45 @@ il renderer non possiede altro che pixel.
 ## Sviluppo
 
 ```bash
-npm run dev           # Vite in hot reload più Electron
-npm run typecheck     # TypeScript, strict
-npm run check         # contro il catalogo OpenRouter reale
-npm run check:config  # valida electron-builder.yml offline
-npm run dist          # installer per il sistema operativo corrente
+npm run dev             # Vite in hot reload più Electron
+npm run typecheck       # TypeScript, strict
+npm run check           # logica, confini di fiducia e catalogo OpenRouter dal vivo
+npm run check:config    # valida electron-builder.yml offline
+npm run check:ui        # ogni schermata, sette lingue, due temi (serve uno schermo)
+npm run smoke           # avvia l'app vera in un profilo usa e getta e la pilota
+npm run dist            # installer per il sistema operativo corrente
+npm run smoke:packaged  # lo stesso, contro l'app dell'installer costruito
+npm run check:fuses     # i fuse di Electron, letti dal binario costruito
+npm run shots           # rigenera gli screenshot del README
 ```
 
-`npm run check` interroga le rotte pubbliche del catalogo senza chiave e
-verifica che ogni modalità abbia modelli, che ogni parametro normalizzato sia
-utilizzabile da un form, che i modelli video espongano durata e tariffa al
-secondo, che la stima a listino coincida con tariffa × durata × quantità, che
-una combinazione mai eseguita non produca un numero inventato, e che ogni prezzo
-porti la sua valuta.
+`npm run check` legge le rotte pubbliche del catalogo senza chiave. Verifica che
+ogni modalità abbia modelli, che ogni parametro normalizzato sia utilizzabile da
+un form, che la modalità di modifica elenchi solo modelli che modificano, che a un
+prezzo non venga mai attribuita un'unità che il catalogo non ha pubblicato, che la
+stima a listino coincida con tariffa × durata × quantità, e che la richiesta
+inviata da una modifica di immagine porti davvero l'immagine. Tiene anche i confini
+di fiducia: un percorso sta dentro la libreria solo se si risolve davvero lì, un
+file rovinato viene messo da parte e mai letto come vuoto, e nessun tipo di media
+dichiarato può produrre un'estensione eseguibile.
+
+`npm run check:ui` disegna l'interfaccia vera contro un backend simulato, che il
+compilatore obbliga a rispettare l'interfaccia reale del bridge, per 186
+combinazioni di schermata, lingua e tema. Fallisce su una stringa lasciata
+non tradotta o nella lingua sbagliata, testo tagliato dal proprio riquadro, un
+controllo di modulo o un pulsante senza nome, un dialogo che non si dichiara tale
+o non si chiude, e su qualunque errore in console.
+
+`npm run smoke` è l'unico controllo che le parti funzionino insieme nella cosa che
+viene distribuita. Avvia l'applicazione, aspetta che venga disegnata, e poi la
+attacca: aprire un file fuori dalla libreria, caricarne uno che l'utente non ha
+mai scelto, far navigare la finestra altrove, chiedere la fotocamera. Ciascuna
+deve essere rifiutata, e un profilo con configurazione e indice della libreria
+rovinati deve comunque partire.
+
+Gli screenshot vengono da `npm run shots`, che legge i pixel della pagina invece di
+catturare lo schermo, e non mostra nessun saldo perché il backend simulato non ne
+ha uno.
 
 `npm run check:config` valida `electron-builder.yml` contro lo schema che
 `app-builder-lib` spedisce. electron-builder valida la propria configurazione

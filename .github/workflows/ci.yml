@@ -45,6 +45,17 @@ jobs:
       - name: Live catalog and cost estimator
         run: npm run check
 
+      # Draws every screen in every language and both themes against a stand-in
+      # backend, and fails on a string left untranslated, text cut off by its box,
+      # a control with no name, a dialog that will not close, or a console error.
+      # The interface had no test at all before this, and everything wrong with
+      # it was found by using it. Needs a display, hence xvfb, and the sandbox
+      # helper needs setuid, which the runner does not grant.
+      - name: Every screen, every language
+        run: |
+          npm run build:renderer
+          xvfb-run -a npm run check:ui -- --no-sandbox --disable-gpu
+
   package:
     name: package (${{ matrix.os }})
     needs: verify

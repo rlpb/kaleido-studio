@@ -6,19 +6,35 @@ updates:
       interval: monthly
     commit-message:
       prefix: "ci"
+    groups:
+      # The release workflow uploads with one and downloads with the other, and
+      # their major versions have to match or the publish job finds nothing to
+      # attach. Updated separately, Dependabot cannot see that they are a pair.
+      artifacts:
+        patterns:
+          - "actions/upload-artifact"
+          - "actions/download-artifact"
 
   - package-ecosystem: npm
     directory: "/"
     schedule:
-      interval: monthly
+      # Electron ships a patch release most weeks and each one can carry
+      # Chromium security fixes, so monthly leaves users a month behind.
+      interval: weekly
     commit-message:
       prefix: "deps"
     groups:
       electron:
         patterns:
           - "electron*"
+          - "@electron/*"
       react:
         patterns:
           - "react"
           - "react-dom"
           - "@types/react*"
+      tooling:
+        dependency-type: development
+        update-types:
+          - minor
+          - patch

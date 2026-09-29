@@ -350,7 +350,15 @@ function priceFromModelEntry(
   return price;
 }
 
-function vendorOf(id: string): string {
+/**
+ * The vendor as the catalog writes it: the part of the name before the colon,
+ * "OpenAI: GPT Image 2" giving "OpenAI". Capitalising the slug instead printed
+ * "Openai" and "Inclusionai" beside every model. The slug stays as the fallback
+ * for a name that has no prefix.
+ */
+export function vendorOf(id: string, name?: string): string {
+  const prefix = name?.includes(':') ? name.split(':')[0].trim() : '';
+  if (prefix && prefix.length <= 32) return prefix;
   const slug = id.split('/')[0] ?? '';
   return slug.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
@@ -559,12 +567,27 @@ async function billsForInputImage(modelId: string, key: string | null): Promise<
   }
 }
 
+/**
+ * Model descriptions arrive as Markdown and are shown as plain text, so a link
+ * printed as `[GPT-5.4](https://openrouter.ai/openai/gpt-5.4)` reached the picker
+ * character for character. The link text stays and the address goes; a link cut
+ * off mid-way by the catalog's own truncation is handled too, since the API
+ * shortens descriptions to a fixed length wherever that falls.
+ */
+export function plainText(markdown: string): string {
+  return markdown
+    .replace(/\[([^\]]+)\]\([^)\s]*\)/g, '$1')
+    .replace(/\[([^\]]+)\]\([^)]*$/, '$1')
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/`([^`]+)`/g, '$1');
+}
+
 function baseModel(entry: any): ModelCore {
   return {
     id: entry.id,
     name: entry.name ?? entry.id,
-    vendor: vendorOf(entry.id),
-    description: String(entry.description ?? '').trim(),
+    vendor: vendorOf(entry.id, entry.name),
+    description: plainText(String(entry.description ?? '')).trim(),
     created: Number(entry.created ?? 0),
     inputModalities: entry.architecture?.input_modalities ?? [],
     outputModalities: entry.architecture?.output_modalities ?? [],

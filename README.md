@@ -14,7 +14,7 @@ Images, video, speech and transcription on OpenRouter, with the controls generat
 [![Platforms](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)](#download)
 [![Ko-fi](https://img.shields.io/badge/Ko--fi-support-FF5E5B?logo=kofi&logoColor=white)](https://ko-fi.com/rlpb_)
 
-[Download](#download) · [How it works](#how-a-generation-works) · [Costs](#costs) · [Security](#key-security) · [FAQ](#faq) · [Italiano](README.it.md)
+[Download](#download) · [How it works](#how-a-generation-works) · [Costs](#costs) · [Security](#security) · [FAQ](#faq) · [Italiano](README.it.md)
 
 </div>
 
@@ -67,6 +67,10 @@ unrelated to it, at full price, with no error. Two signals are read to tell them
 apart, because each one fails on its own: the vendor description, and whether an
 endpoint bills `input_image` for a picture the model consumes rather than
 `input_reference` for one it only looks at.
+
+<div align="center">
+<img src="docs/screenshot-edit.png" alt="The edit screen, listing only the models that edit the image they are given" width="900">
+</div>
 
 ## The idea it is built on
 
@@ -143,29 +147,44 @@ own model page labels **Audio Hours … /hour**.
 No documented route publishes that label. `/api/v1/models`, the `/endpoints`
 route and `?include=display_pricing` all omit it. So Kaleido shows those rates at
 their own scale with the unit left unnamed, rather than multiplying by a million
-and calling the result a token price. Thirty models in the current catalog fall
+and calling the result a token price. More than thirty models in the catalog fall
 into this case, and a check fails if any of them is ever labelled per token
 again.
 
+## Security
 
-## Key security
+An app that holds an API key and writes files should be checkable, so this is
+what it does and how each claim is held to.
 
-The key is encrypted with the operating system keychain through Electron's
-`safeStorage`: Credential Manager on Windows, Keychain on macOS, `libsecret` on
-Linux. It is stored in the app data folder and never leaves the machine except
-towards `openrouter.ai`.
+**The key.** It is encrypted with the operating system keychain through
+Electron's `safeStorage`: Credential Manager on Windows, Keychain on macOS,
+`libsecret` on Linux. It is stored in the app data folder and never leaves the
+machine except towards `openrouter.ai`. Where no keychain is available Electron
+degrades silently; Kaleido records that case and labels it in Settings as
+*stored in plain text*, rather than letting you believe it is encrypted. There is
+no telemetry, no analytics, and no network destination other than OpenRouter.
 
-Where no keychain is available, Electron does not fail. It degrades silently.
-Kaleido records that case and labels it in Settings as *stored in plain text*,
-rather than letting you believe it is encrypted.
+**The interface is treated as untrusted.** The renderer runs sandboxed, with
+`contextIsolation` and no Node integration, and never receives the key. Every IPC
+handler answers only the application's own page. A file is opened, revealed or
+copied only from inside the library folder, a generation reads a local file only
+if you chose it, and the extension of a saved file comes from a fixed table
+instead of from the type a provider declares. The window cannot navigate away
+and is denied every browser permission but the clipboard.
 
-The renderer runs with `contextIsolation`, `sandbox` and no Node integration. It
-never receives the key, and talks to the main process over typed IPC only.
-Library files reach it through a custom protocol that resolves the requested
-path and refuses anything outside the library folder.
+**Your data survives a bad write.** The configuration and the library index are
+written through a temporary file and a rename. A file that will not parse is
+moved aside under a name that says so instead of being read as empty and
+overwritten, which is how one truncated write would otherwise have cost you the
+key, the presets and the whole library index.
 
-There is no telemetry, no analytics, and no network destination other than
-OpenRouter.
+**The build is hardened and starts before it ships.** The Electron fuses are set
+at build time: the executable cannot be used as a Node interpreter, cannot be
+attached to with `--inspect`, and refuses to start if a single byte of
+`app.asar` has changed. CI reads the fuses back out of the built binary, then
+starts the packaged app on Windows, macOS and Linux and drives it, including
+sending it the requests above and watching them be refused. The full list, and
+how to report a problem, is in [SECURITY.md](SECURITY.md).
 
 ## Download
 
@@ -180,11 +199,18 @@ Installers for Windows, macOS and Linux are built by
 | macOS | `.dmg`, Intel and Apple silicon |
 | Linux | `.AppImage`, or `.deb` |
 
-The builds are unsigned. Windows SmartScreen and macOS Gatekeeper will warn on
-first launch.
+The builds are not code-signed, so Windows SmartScreen and macOS Gatekeeper warn
+on first launch. What replaces a signature is two checks you can run yourself.
 
-Every release carries a `SHA256SUMS.txt` produced by the same workflow that built
-the installers, so you can confirm the file you downloaded is the file CI made:
+Every installer carries a signed build-provenance attestation: which repository,
+which workflow and which commit produced these exact bytes. It is verified
+against GitHub, without trusting anything on the release page:
+
+```bash
+gh attestation verify "Kaleido.Studio-<version>-x64.exe" --repo rlpb/kaleido-studio
+```
+
+And every release lists a SHA-256 checksum for each installer:
 
 ```bash
 sha256sum -c SHA256SUMS.txt --ignore-missing
@@ -249,18 +275,26 @@ provides them.
 electron/
 ├── main.ts               window, IPC, the media protocol, the menu
 ├── preload.ts            the contextBridge surface the renderer sees
+├── security.ts           which page counts as the app, IPC sender check, permissions
+├── paths.ts              "is this file really inside that folder"
+├── atomic-json.ts        atomic writes, and a damaged file set aside instead of read as empty
+├── media-types.ts        the table that decides a saved file's extension
 ├── openrouter.ts         API client and capability normalisation
 ├── keepalive-request.ts  the HTTPS path that can reach setKeepAlive
-├── jobs.ts               queue, request building, video polling, saving
+├── request-body.ts       the body each endpoint expects, built from a job
+├── jobs.ts               queue, video polling, saving
 ├── store.ts              configuration, encrypted key, presets, observed costs
 └── library.ts            files on disk and the library index
 src/
 ├── screens/              onboarding, studio, library, settings
 ├── components/           model picker, generated form, inputs, cards, viewer
-└── lib/                  shared types, mode definitions, pricing, i18n
+└── lib/                  shared types, mode definitions, pricing, parameters, i18n
 scripts/
-├── selfcheck.mjs               checks against the live API
+├── selfcheck.mjs               logic and the live catalog, no key needed
+├── app-smoke.mjs               starts the real app and drives it over DevTools
+├── check-fuses.mjs             reads the Electron fuses out of the built binary
 ├── validate-builder-config.mjs validates the packaging config offline
+├── ui/                         the stand-in backend, the screen-by-screen check, the screenshots
 └── make-icon.mjs               generates the app icon, no binary in the repo
 ```
 
@@ -271,18 +305,42 @@ pixels.
 ## Development
 
 ```bash
-npm run dev           # Vite with hot reload plus Electron
-npm run typecheck     # TypeScript, strict
-npm run check         # against the real OpenRouter catalog
-npm run check:config  # validates electron-builder.yml offline
-npm run dist          # installers for the current operating system
+npm run dev             # Vite with hot reload plus Electron
+npm run typecheck       # TypeScript, strict
+npm run check           # logic, trust boundaries and the live OpenRouter catalog
+npm run check:config    # validates electron-builder.yml offline
+npm run check:ui        # every screen, seven languages, two themes (needs a display)
+npm run smoke           # starts the real app in a throwaway profile and drives it
+npm run dist            # installers for the current operating system
+npm run smoke:packaged  # the same, against the built installer's app
+npm run check:fuses     # the Electron fuses, read from the built binary
+npm run shots           # regenerates the README screenshots
 ```
 
-`npm run check` queries the public catalog routes without a key and asserts that
+`npm run check` reads the public catalog routes without a key. It asserts that
 every mode has models, that every normalised parameter is usable by a form, that
-video models expose a duration and a per-second rate, that the list-price
-estimate equals rate × duration × count, that a combination never run produces
-no invented number, and that every price carries its currency.
+the edit mode lists only models that edit, that a price is never given a unit the
+catalog did not publish, that the list-price estimate equals rate × duration ×
+count, and that the request an image edit sends actually carries the image. It
+also holds the trust boundaries: a path is inside the library only if it really
+resolves inside, a damaged file is set aside and never read as empty, and no
+declared media type can produce an executable extension.
+
+`npm run check:ui` draws the real interface against a stand-in backend that the
+compiler holds to the real bridge interface, for 186 combinations of screen,
+language and theme. It fails on a string left untranslated or in the wrong
+language, text cut off by its box, a form control or button with no name, a
+dialog that does not declare itself or will not close, and any console error.
+
+`npm run smoke` is the one check that the parts work together in the thing that
+ships. It starts the application, waits for it to render, and then attacks it:
+opening a file outside the library, uploading one the user never chose,
+navigating the window elsewhere, asking for the camera. Each has to be refused,
+and a profile with a damaged config and library index has to start.
+
+Screenshots come from `npm run shots`, which reads the page's own pixels instead
+of capturing the screen, and draws no account balance because the stand-in
+backend has none.
 
 `npm run check:config` validates `electron-builder.yml` against the schema
 `app-builder-lib` ships. electron-builder validates its config as the first step

@@ -96,11 +96,12 @@ export default function LibraryScreen({ push }: { push: Push }) {
             <input
               type="search"
               placeholder={t('library.search')}
+              aria-label={t('library.search')}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
-          <select value={mode} onChange={(e) => setMode(e.target.value as ModeId | 'all')}>
+          <select value={mode} aria-label={t('library.filterMode')} onChange={(e) => setMode(e.target.value as ModeId | 'all')}>
             <option value="all">{t('library.allModes')}</option>
             {MODES.map((m) => (
               <option key={m.id} value={m.id}>
@@ -108,7 +109,7 @@ export default function LibraryScreen({ push }: { push: Push }) {
               </option>
             ))}
           </select>
-          <select value={kind} onChange={(e) => setKind(e.target.value as MediaKind | 'all')}>
+          <select value={kind} aria-label={t('library.filterKind')} onChange={(e) => setKind(e.target.value as MediaKind | 'all')}>
             <option value="all">{t('library.allTypes')}</option>
             <option value="image">{t('library.images')}</option>
             <option value="video">{t('library.video')}</option>

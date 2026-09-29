@@ -191,7 +191,7 @@ export default function SettingsScreen({ settings, keyState, setSettings, onKeyC
           <div className="field">
             <label>{t('settings.libraryFolder')}</label>
             <div className="row">
-              <input readOnly className="mono" value={settings.libraryPath} />
+              <input readOnly className="mono" aria-label={t('settings.libraryFolder')} value={settings.libraryPath} />
               <button className="btn" onClick={async () => setSettings(await bridge.settings.pickLibrary())}>
                 <Icon name="folder" />
                 {t('settings.change')}

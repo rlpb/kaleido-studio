@@ -29,7 +29,7 @@ export interface AppInfo {
   userData: string;
 }
 
-interface Bridge {
+export interface Bridge {
   key: {
     set(key: string): Promise<KeyState & { encrypted: boolean }>;
     status(): Promise<KeyState>;
