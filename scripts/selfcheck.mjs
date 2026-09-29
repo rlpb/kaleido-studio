@@ -8,7 +8,7 @@
  */
 import assert from 'node:assert/strict';
 import { build } from 'esbuild';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -44,6 +44,10 @@ const api = await load('electron/openrouter.ts', 'openrouter');
 const pricing = await load('src/lib/pricing.ts', 'pricing');
 const paramsLib = await load('src/lib/params.ts', 'params');
 const body = await load('electron/request-body.ts', 'request-body');
+const paths = await load('electron/paths.ts', 'paths');
+const atomic = await load('electron/atomic-json.ts', 'atomic-json');
+const media = await load('electron/media-types.ts', 'media-types');
+const security = await load('electron/security.ts', 'security');
 
 console.log('\nOpenRouter catalog');
 const catalog = await api.fetchCatalog(null);
@@ -410,6 +414,128 @@ await check('an unknown extension is not passed off as an image', () => {
   assert.equal(body.mimeOf('a/b/voice.m4a'), 'audio/mp4');
   assert.equal(body.mimeOf('a/b/thing.heic'), 'application/octet-stream');
   assert.equal(body.mimeOf('a/b/noextension'), 'application/octet-stream');
+});
+
+console.log('\nTrust boundaries');
+
+await check('a path is inside the library only when it really resolves inside', () => {
+  // Each refusal sits next to an acceptance on the same root, so a function
+  // that simply refused everything would fail here rather than pass. Both path
+  // flavours run on every machine: the Windows rules are the ones with drives,
+  // case folding and UNC roots, and CI is not Windows.
+  const posix = (target) => paths.isInside('/data/lib', target, path.posix);
+  assert.equal(posix('/data/lib/2026-09/a.png'), true, 'a file inside was refused');
+  assert.equal(posix('/data/lib/sub/../a.png'), true, 'a path that resolves inside was refused');
+  assert.equal(posix('/data/lib/..hidden'), true, '"..hidden" is a legal name and was refused');
+  assert.equal(posix('/data/lib'), false, 'the root itself counted as a file inside it');
+  assert.equal(posix('/data/lib-evil/a.png'), false, 'a sibling sharing the prefix counted as inside');
+  assert.equal(posix('/data/lib/../etc/passwd'), false, 'a traversal counted as inside');
+  assert.equal(posix('/etc/passwd'), false);
+
+  const win = (target) => paths.isInside('C:\\Users\\me\\Kaleido\\Library', target, path.win32);
+  assert.equal(win('C:\\Users\\me\\Kaleido\\Library\\2026-09\\a.png'), true, 'a Windows file inside was refused');
+  assert.equal(win('c:\\users\\me\\kaleido\\library\\a.png'), true, 'Windows paths are case-insensitive');
+  assert.equal(win('C:\\Users\\me\\Kaleido\\Library-old\\a.png'), false, 'a sibling counted as inside');
+  assert.equal(win('D:\\Users\\me\\Kaleido\\Library\\a.png'), false, 'another drive counted as inside');
+  assert.equal(win('C:\\Users\\me\\Kaleido\\Library\\..\\..\\secret.txt'), false, 'a traversal counted as inside');
+  assert.equal(win('\\\\server\\share\\Library\\a.png'), false, 'a UNC path counted as inside');
+});
+
+await check('a damaged file is set aside, never read as empty', () => {
+  // The config holds the encrypted API key and the library index is the only
+  // record of what was generated. Both used to read a file they could not parse
+  // as empty, and the next save replaced it: one bad byte from a power cut and
+  // everything was gone, silently.
+  const dir = mkdtempSync(path.join(tmpdir(), 'kaleido-json-'));
+  const file = path.join(dir, 'config.json');
+  const isObject = (v) => typeof v === 'object' && v !== null && !Array.isArray(v);
+
+  // A missing file is a first run, and is the one case that yields the fallback quietly.
+  const first = atomic.readJsonOrQuarantine(file, { fresh: true }, isObject);
+  assert.deepEqual(first.value, { fresh: true });
+  assert.equal(first.quarantinedTo, undefined, 'a missing file was reported as damaged');
+
+  // A write leaves the file and nothing else behind.
+  atomic.writeJsonAtomic(file, { key: 'ciphertext', presets: [1, 2, 3] });
+  assert.deepEqual(readdirSync(dir), ['config.json'], `a temporary file was left behind: ${readdirSync(dir)}`);
+  assert.deepEqual(atomic.readJsonOrQuarantine(file, {}, isObject).value, { key: 'ciphertext', presets: [1, 2, 3] });
+
+  // Truncated mid-write: the state a power cut leaves.
+  const truncated = '{ "key": "ciphertext", "presets": [1, 2';
+  writeFileSync(file, truncated);
+  const damaged = atomic.readJsonOrQuarantine(file, { fresh: true }, isObject);
+  assert.deepEqual(damaged.value, { fresh: true });
+  assert.ok(damaged.quarantinedTo, 'a truncated file was not reported');
+  assert.equal(readFileSync(damaged.quarantinedTo, 'utf8'), truncated, 'the damaged bytes were not preserved');
+  assert.equal(existsSync(file), false, 'the damaged file was left where the next write would replace it');
+
+  // The save that follows must not touch what was set aside.
+  atomic.writeJsonAtomic(file, { fresh: true });
+  assert.equal(readFileSync(damaged.quarantinedTo, 'utf8'), truncated, 'a later save overwrote the preserved copy');
+
+  // Valid JSON of the wrong shape is damage too, not "an empty list".
+  writeFileSync(file, '{"not":"a list"}');
+  const wrong = atomic.readJsonOrQuarantine(file, [], Array.isArray);
+  assert.deepEqual(wrong.value, []);
+  assert.ok(wrong.quarantinedTo, 'a value of the wrong shape was accepted');
+
+  // Unreadable is not empty. A directory where the file should be is the
+  // portable way to make a read fail with something other than "not found".
+  const blocked = path.join(dir, 'index.json');
+  mkdirSync(blocked);
+  assert.throws(() => atomic.readJsonOrQuarantine(blocked, [], Array.isArray), /Cannot read/, 'an unreadable file was treated as empty');
+  rmSync(dir, { recursive: true, force: true });
+});
+
+await check('no declared media type can name an executable extension', () => {
+  // The extension of a saved file came from the type the provider declared,
+  // falling back to its raw subtype, so a response claiming application/bat was
+  // saved as a .bat inside the library. Property, not examples: whatever the
+  // type is, the file that results must be one the app is willing to open.
+  const hostile = [
+    ['application/bat', 'image'],
+    ['application/x-msdownload', 'video'],
+    ['application/exe', 'audio'],
+    ['text/html', 'text'],
+    ['application/javascript', 'text'],
+    ['image/png; charset=utf-8', 'image'],
+    ['', 'image'],
+    ['../../evil', 'video'],
+    ['audio/mpeg\u0000.exe', 'audio'],
+  ];
+  for (const [type, kind] of hostile) {
+    const ext = media.extensionFor(type, kind);
+    assert.ok(media.isOpenable(`saved.${ext}`), `"${type}" produced .${ext}, which the app would not open`);
+    assert.ok(!/^(bat|cmd|exe|com|scr|ps1|vbs|js|sh|msi|lnk|html|htm)$/.test(ext), `"${type}" produced .${ext}`);
+  }
+  // The controls: the table still does its job, and the refusal is real.
+  assert.equal(media.extensionFor('image/png', 'image'), 'png');
+  assert.equal(media.extensionFor('audio/mpeg; codecs=mp3', 'audio'), 'mp3');
+  assert.equal(media.extensionFor('video/quicktime', 'video'), 'mov');
+  assert.equal(media.isOpenable('a.PNG'), true);
+  for (const bad of ['a.bat', 'a.EXE', 'a.lnk', 'a.ps1', 'a.html', 'noextension']) {
+    assert.equal(media.isOpenable(bad), false, `${bad} would be handed to the operating system`);
+  }
+});
+
+await check('only the application\u2019s own page counts as the application', () => {
+  const app = (url, dev) => security.isAppUrl(url, dev);
+  // The installed page, wherever the install put it: spaces, the asar segment
+  // and a hash route all occur, and refusing the real page would disable every
+  // IPC call in a build that no local run exercises.
+  assert.equal(app('file:///C:/Users/John%20Doe/AppData/Local/Programs/Kaleido%20Studio/resources/app.asar/dist/index.html'), true);
+  assert.equal(app('file:///home/me/kaleido/dist/index.html#/library'), true);
+  assert.equal(app('http://localhost:5173/', 'http://localhost:5173'), true);
+  // Everything else, including the near misses.
+  assert.equal(app('file:///C:/evil/index.html'), false, 'another local page counted as the application');
+  assert.equal(app('file:///C:/x/dist/index.html.exe'), false);
+  assert.equal(app('file:///C:/Windows/win.ini'), false);
+  assert.equal(app('https://evil.example/dist/index.html'), false, 'a remote page counted as the application');
+  assert.equal(app('http://localhost:5173.evil.example/', 'http://localhost:5173'), false, 'a lookalike origin counted');
+  assert.equal(app('http://localhost:5173/'), false, 'the dev server counted when no dev URL was given');
+  assert.equal(app('kal://local/?p=x'), false);
+  assert.equal(app('not a url'), false);
+  assert.equal(app(''), false);
 });
 
 console.log('\nHTTP client');

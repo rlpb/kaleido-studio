@@ -1,7 +1,8 @@
 import { app, safeStorage } from 'electron';
-import fs from 'node:fs';
 import path from 'node:path';
 import type { ModeId, Preset, Settings } from '../src/lib/types';
+import { MODE_BY_ID } from '../src/lib/modes';
+import { readJsonOrQuarantine, writeJsonAtomic } from './atomic-json';
 
 const CONFIG_FILE = 'config.json';
 
@@ -54,22 +55,24 @@ function systemLanguage(): string {
   }
 }
 
+const isConfig = (value: unknown): value is Partial<StoredConfig> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
 function load(): StoredConfig {
   if (cache) return cache;
-  try {
-    const raw = fs.readFileSync(configPath(), 'utf8');
-    cache = { ...DEFAULTS, ...(JSON.parse(raw) as Partial<StoredConfig>) };
-  } catch {
-    // A missing or corrupt config is the first-run state, not an error.
-    cache = { ...DEFAULTS };
-  }
+  // A missing file is the first run. One that exists and cannot be parsed is
+  // moved aside instead of being read as empty: this file holds the encrypted
+  // API key, the presets and the prompt history, and the next save would
+  // otherwise replace all of it with defaults.
+  const { value, quarantinedTo } = readJsonOrQuarantine<Partial<StoredConfig>>(configPath(), {}, isConfig);
+  if (quarantinedTo) console.error(`config was unreadable, kept as ${quarantinedTo}`);
+  cache = { ...DEFAULTS, ...value };
   return cache;
 }
 
 function save(next: StoredConfig): void {
+  writeJsonAtomic(configPath(), next);
   cache = next;
-  fs.mkdirSync(path.dirname(configPath()), { recursive: true });
-  fs.writeFileSync(configPath(), JSON.stringify(next, null, 2), 'utf8');
 }
 
 function patch(changes: Partial<StoredConfig>): StoredConfig {
@@ -142,18 +145,37 @@ export function getSettings(): Settings {
   };
 }
 
+/**
+ * What the renderer may change through the general settings call.
+ *
+ * Each field is checked against what it can legitimately be, because this is
+ * the boundary where a request stops being code this project wrote. The library
+ * folder is deliberately not among them: it decides where files get written, so
+ * it changes only through the folder dialog, in `setLibraryPath` below.
+ */
 export function updateSettings(changes: Partial<Settings>): Settings {
   const allowed: Partial<StoredConfig> = {};
-  if (changes.theme) allowed.theme = changes.theme;
-  if (changes.language) allowed.language = changes.language;
-  if (changes.libraryPath) allowed.libraryPath = changes.libraryPath;
-  if (changes.favoriteModels) allowed.favoriteModels = changes.favoriteModels;
-  if (changes.lastMode) allowed.lastMode = changes.lastMode;
-  if (changes.lastModelByMode) allowed.lastModelByMode = changes.lastModelByMode;
-  if (typeof changes.concurrency === 'number') {
+  if (changes.theme === 'dark' || changes.theme === 'light' || changes.theme === 'system') allowed.theme = changes.theme;
+  if (typeof changes.language === 'string' && changes.language.length <= 16) allowed.language = changes.language;
+  if (Array.isArray(changes.favoriteModels) && changes.favoriteModels.every((m) => typeof m === 'string')) {
+    allowed.favoriteModels = changes.favoriteModels;
+  }
+  if (typeof changes.lastMode === 'string' && changes.lastMode in MODE_BY_ID) allowed.lastMode = changes.lastMode;
+  if (changes.lastModelByMode && typeof changes.lastModelByMode === 'object') {
+    allowed.lastModelByMode = Object.fromEntries(
+      Object.entries(changes.lastModelByMode).filter(([mode, id]) => mode in MODE_BY_ID && typeof id === 'string'),
+    );
+  }
+  if (typeof changes.concurrency === 'number' && Number.isFinite(changes.concurrency)) {
     allowed.concurrency = Math.min(6, Math.max(1, Math.round(changes.concurrency)));
   }
   patch(allowed);
+  return getSettings();
+}
+
+/** Called only with the result of the folder dialog this process opened. */
+export function setLibraryPath(folder: string): Settings {
+  patch({ libraryPath: folder });
   return getSettings();
 }
 

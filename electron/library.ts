@@ -3,34 +3,11 @@ import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import type { LibraryItem, MediaKind, ModeId } from '../src/lib/types';
 import { getSettings } from './store';
+import { readJsonOrQuarantine, writeJsonAtomic } from './atomic-json';
+import { extensionFor } from './media-types';
+import { isInside } from './paths';
 
 const INDEX_FILE = 'index.json';
-
-const EXTENSIONS: Record<string, string> = {
-  'image/png': 'png',
-  'image/jpeg': 'jpg',
-  'image/webp': 'webp',
-  'image/svg+xml': 'svg',
-  'video/mp4': 'mp4',
-  'video/webm': 'webm',
-  'video/quicktime': 'mov',
-  'audio/mpeg': 'mp3',
-  'audio/mp3': 'mp3',
-  'audio/wav': 'wav',
-  'audio/x-wav': 'wav',
-  'audio/ogg': 'ogg',
-  'audio/flac': 'flac',
-  'audio/pcm': 'pcm',
-  'text/plain': 'txt',
-};
-
-function extensionFor(mediaType: string, kind: MediaKind): string {
-  const clean = mediaType.split(';')[0].trim().toLowerCase();
-  if (EXTENSIONS[clean]) return EXTENSIONS[clean];
-  const guess = clean.split('/')[1];
-  if (guess && /^[a-z0-9]+$/.test(guess)) return guess;
-  return kind === 'image' ? 'png' : kind === 'video' ? 'mp4' : kind === 'audio' ? 'mp3' : 'txt';
-}
 
 function root(): string {
   const dir = getSettings().libraryPath;
@@ -42,18 +19,20 @@ function indexPath(): string {
   return path.join(root(), INDEX_FILE);
 }
 
+/**
+ * The index is the only record of what was generated, so a copy it cannot parse
+ * is moved aside rather than treated as empty. Treating it as empty was worse
+ * than it looks: the next saved result wrote a one-item index over it, and every
+ * earlier entry vanished from the library while its file stayed on disk.
+ */
 function readIndex(): LibraryItem[] {
-  try {
-    const parsed = JSON.parse(fs.readFileSync(indexPath(), 'utf8'));
-    return Array.isArray(parsed) ? (parsed as LibraryItem[]) : [];
-  } catch {
-    return [];
-  }
+  const { value, quarantinedTo } = readJsonOrQuarantine<LibraryItem[]>(indexPath(), [], Array.isArray);
+  if (quarantinedTo) console.error(`library index was unreadable, kept as ${quarantinedTo}`);
+  return value;
 }
 
 function writeIndex(items: LibraryItem[]): void {
-  fs.mkdirSync(root(), { recursive: true });
-  fs.writeFileSync(indexPath(), JSON.stringify(items, null, 2), 'utf8');
+  writeJsonAtomic(indexPath(), items);
 }
 
 export interface SaveInput {
@@ -149,7 +128,9 @@ export function deleteItem(id: string, deleteFile = true): boolean {
   const items = readIndex();
   const item = items.find((i) => i.id === id);
   if (!item) return false;
-  if (deleteFile) {
+  // The path comes from the index, which is a plain file anyone can edit. A
+  // deletion only follows it while it points inside the library.
+  if (deleteFile && isInside(root(), item.path)) {
     try {
       fs.unlinkSync(item.path);
     } catch {

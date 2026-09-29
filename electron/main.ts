@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, net, protocol, shell } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, Menu, net, protocol, session, shell } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -7,6 +7,9 @@ import { fetchCatalog, checkKey, getCredits, setFetch } from './openrouter';
 import * as store from './store';
 import * as library from './library';
 import { runner } from './jobs';
+import { isOpenable } from './media-types';
+import { isInside } from './paths';
+import { hardenSession, isAppUrl, isTrustedSender } from './security';
 
 const IS_DEV = process.env.KALEIDO_DEV === '1';
 const DEV_URL = 'http://localhost:5173';
@@ -32,7 +35,7 @@ protocol.registerSchemesAsPrivileged([
  * containment below exists to protect.
  */
 const previewable = new Set<string>();
-const PREVIEWABLE_LIMIT = 200;
+const PREVIEWABLE_LIMIT = 2000;
 
 export function allowPreview(input: string): void {
   const resolved = path.resolve(input);
@@ -44,6 +47,36 @@ export function allowPreview(input: string): void {
     if (oldest) previewable.delete(oldest);
   }
   previewable.add(resolved);
+}
+
+function libraryRoot(): string {
+  return path.resolve(store.getSettings().libraryPath);
+}
+
+/**
+ * The file a library call is allowed to act on, or an error.
+ *
+ * These handlers take a path from the renderer and hand it to the operating
+ * system: open, reveal, copy. A path is only honoured while it resolves inside
+ * the library folder, which is where every file the app produced lives.
+ */
+function requireLibraryFile(filePath: unknown): string {
+  if (typeof filePath !== 'string' || !filePath) throw new Error('No file was given.');
+  if (!isInside(libraryRoot(), filePath)) throw new Error('That file is outside the library folder.');
+  return path.resolve(filePath);
+}
+
+/**
+ * Whether a job may read this input. A remote URL is passed to the provider as
+ * it is; a local path must be a file the user chose through a dialog or dropped
+ * on the window, or one the library holds. Anything else would let the renderer
+ * name any file on the disk and have it uploaded to the provider.
+ */
+function isAllowedInput(input: unknown): boolean {
+  if (typeof input !== 'string' || !input) return false;
+  if (/^https?:\/\//i.test(input) || input.startsWith('data:')) return true;
+  const resolved = path.resolve(input);
+  return previewable.has(resolved) || isInside(libraryRoot(), resolved);
 }
 
 /**
@@ -61,10 +94,7 @@ function serveMedia(request: Request): Promise<Response> {
   const requested = url.searchParams.get('p');
   if (!requested) return Promise.resolve(new Response('Bad request', { status: 400 }));
   const resolved = path.resolve(requested);
-  const root = path.resolve(store.getSettings().libraryPath);
-  const relative = path.relative(root, resolved);
-  const insideLibrary = relative !== '' && !relative.startsWith('..') && !path.isAbsolute(relative);
-  if (!insideLibrary && !previewable.has(resolved)) {
+  if (!isInside(libraryRoot(), resolved) && !previewable.has(resolved)) {
     return Promise.resolve(new Response('Forbidden', { status: 403 }));
   }
   return net.fetch(pathToFileURL(resolved).toString());
@@ -117,12 +147,17 @@ function createWindow(): void {
     if (/^https?:\/\//i.test(url)) void shell.openExternal(url);
     return { action: 'deny' };
   });
-  mainWindow.webContents.on('will-navigate', (event, url) => {
-    if (!url.startsWith(DEV_URL) && !url.startsWith('file://')) {
-      event.preventDefault();
-      if (/^https?:\/\//i.test(url)) void shell.openExternal(url);
-    }
-  });
+  // The window shows this application's own page and nothing else. Any other
+  // destination, a redirect included, is refused, and a web link opens in the
+  // system browser instead. It used to accept every file:// URL, which let the
+  // window be pointed at any local page while the preload stayed attached.
+  const keepOnAppPage = (event: Electron.Event, url: string) => {
+    if (isAppUrl(url, IS_DEV ? DEV_URL : undefined)) return;
+    event.preventDefault();
+    if (/^https?:\/\//i.test(url)) void shell.openExternal(url);
+  };
+  mainWindow.webContents.on('will-navigate', keepOnAppPage);
+  mainWindow.webContents.on('will-redirect', keepOnAppPage);
 
   runner.attach(mainWindow);
 
@@ -174,7 +209,12 @@ function buildMenu(): void {
 // ---------------------------------------------------------------------------
 
 function handle<T>(channel: string, fn: (...args: any[]) => Promise<T> | T): void {
-  ipcMain.handle(channel, async (_event, ...args) => {
+  ipcMain.handle(channel, async (event, ...args) => {
+    // Every handler acts on the disk or on the API key, so each one answers the
+    // application's own page and nothing else.
+    if (!isTrustedSender(event, mainWindow, IS_DEV ? DEV_URL : undefined)) {
+      return { ok: false, error: 'Refused: the request did not come from the application window.' };
+    }
     try {
       return { ok: true, data: await fn(...args) };
     } catch (err) {
@@ -227,10 +267,15 @@ function registerIpc(): void {
       defaultPath: store.getSettings().libraryPath,
     });
     if (result.canceled || !result.filePaths[0]) return store.getSettings();
-    return store.updateSettings({ libraryPath: result.filePaths[0] });
+    return store.setLibraryPath(result.filePaths[0]);
   });
 
-  handle('jobs:enqueue', (req: JobRequest, modelName: string) => runner.enqueue(req, modelName));
+  handle('jobs:enqueue', (req: JobRequest, modelName: string) => {
+    const inputs = Array.isArray(req?.inputs) ? req.inputs : [];
+    const refused = inputs.find((input) => !isAllowedInput(input));
+    if (refused !== undefined) throw new Error('One of the input files was not chosen through the application.');
+    return runner.enqueue(req, modelName);
+  });
   handle('jobs:list', () => runner.list());
   handle('jobs:cancel', (id: string) => {
     runner.cancel(id);
@@ -256,7 +301,8 @@ function registerIpc(): void {
    * as a string, so a problem reaches the user as an in-app message. Selecting
    * the file is worth less than knowing whether the action worked.
    */
-  handle('library:reveal', async (filePath: string) => {
+  handle('library:reveal', async (requested: string) => {
+    const filePath = requireLibraryFile(requested);
     const folder = path.dirname(filePath);
     if (!fs.existsSync(filePath)) {
       if (!fs.existsSync(folder)) throw new Error(`Neither the file nor its folder exist any more: ${filePath}`);
@@ -268,9 +314,18 @@ function registerIpc(): void {
     if (error) throw new Error(error);
     return true;
   });
-  handle('library:open', (filePath: string) => shell.openPath(filePath));
+  // shell.openPath runs whatever the file is, so it is only ever given a media
+  // file from inside the library. An executable there would be one click from
+  // being launched, and the extension of a saved file used to come from a type
+  // the provider declared (see media-types.ts).
+  handle('library:open', (requested: string) => {
+    const filePath = requireLibraryFile(requested);
+    if (!isOpenable(filePath)) throw new Error('This kind of file is not opened from the application.');
+    return shell.openPath(filePath);
+  });
 
-  handle('library:export', async (filePath: string) => {
+  handle('library:export', async (requested: string) => {
+    const filePath = requireLibraryFile(requested);
     const result = await dialog.showSaveDialog({
       title: 'Save a copy',
       defaultPath: path.basename(filePath),
@@ -350,6 +405,8 @@ if (!app.requestSingleInstanceLock()) {
     // Chromium's network stack rather than Node's: system proxy and certificate
     // store, and TCP keep-alive on the socket that waits out a generation.
     setFetch((url, init) => net.fetch(url, init));
+    // Before any window exists, so the policy is in force for the first load.
+    hardenSession(session.defaultSession);
     protocol.handle(MEDIA_SCHEME, serveMedia);
     registerIpc();
     buildMenu();
