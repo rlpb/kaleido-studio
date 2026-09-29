@@ -14,6 +14,24 @@ files:
 # The renderer and main bundles are already built; nothing else ships.
 asar: true
 
+# Switches compiled into the Electron binary. They close ways of abusing the
+# executable that a user's own copy of the app does not need, and they are read
+# back from the built binary by scripts/check-fuses.mjs on every build.
+electronFuses:
+  # The signed executable stops being usable as a general Node interpreter.
+  runAsNode: false
+  # NODE_OPTIONS and --inspect are how a running app is attached to from outside.
+  enableNodeOptionsEnvironmentVariable: false
+  enableNodeCliInspectArguments: false
+  # Code is loaded from app.asar only, and the archive is verified against a
+  # digest embedded when it was built.
+  onlyLoadAppFromAsar: true
+  enableEmbeddedAsarIntegrityValidation: true
+  # Left on deliberately: the page is served from file://, and its module
+  # scripts need what this grants. Turning it off means serving the page from a
+  # custom protocol first.
+  grantFileProtocolExtraPrivileges: true
+
 win:
   target:
     - target: nsis

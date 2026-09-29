@@ -26,8 +26,9 @@ import net from 'node:net';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { packagedExecutable } from './lib/packaged.mjs';
 
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const root =path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const pkg = JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8'));
 
 // ---------------------------------------------------------------------------
@@ -43,31 +44,13 @@ const option = (name) => {
   return at === -1 ? null : (own[at + 1] ?? null);
 };
 
-/** The unpacked application electron-builder leaves behind, for this platform. */
-function packagedExecutable(releaseDir) {
-  const dir = path.resolve(root, releaseDir);
-  const arm = process.arch === 'arm64';
-  const candidates =
-    process.platform === 'win32'
-      ? [path.join(dir, arm ? 'win-arm64-unpacked' : 'win-unpacked', `${pkg.build?.productName ?? 'Kaleido Studio'}.exe`)]
-      : process.platform === 'darwin'
-        ? [path.join(dir, arm ? 'mac-arm64' : 'mac', 'Kaleido Studio.app', 'Contents', 'MacOS', 'Kaleido Studio')]
-        : [path.join(dir, arm ? 'linux-arm64-unpacked' : 'linux-unpacked', 'kaleido-studio')];
-  const found = candidates.find((candidate) => existsSync(candidate));
-  if (!found) {
-    const listing = existsSync(dir) ? readdirSync(dir).join(', ') : `(${dir} does not exist)`;
-    throw new Error(`No packaged executable found. Looked for:\n  ${candidates.join('\n  ')}\nThe folder holds: ${listing}`);
-  }
-  return found;
-}
-
 let executable;
 let appDirArgs;
 if (option('--exe')) {
   executable = path.resolve(option('--exe'));
   appDirArgs = [];
 } else if (option('--packaged')) {
-  executable = packagedExecutable(option('--packaged'));
+  executable = packagedExecutable(root, option('--packaged'));
   appDirArgs = [];
 } else {
   // Resolved through the npm package, which exports the path of the binary.

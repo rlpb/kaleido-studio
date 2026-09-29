@@ -27,6 +27,7 @@ jobs:
     uses: ./.github/workflows/guards.yml
     with:
       ref: ${{ github.event.inputs.tag || github.ref_name }}
+      # The interface ships its strings in seven languages by design.
       language-excludes: "--exclude-dir=locales"
 
   verify:
@@ -81,6 +82,20 @@ jobs:
         run: npx electron-builder --publish never
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # The same two gates the push workflow runs, on the build about to be
+      # published: a release must clear the bar that an ordinary push clears.
+      - name: Electron fuses are set in the built app
+        run: npm run check:fuses
+
+      - name: The packaged app starts and holds its guards
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = "Linux" ]; then
+            xvfb-run -a npm run smoke:packaged -- -- --no-sandbox --disable-gpu
+          else
+            npm run smoke:packaged
+          fi
 
       - uses: actions/upload-artifact@v7
         with:

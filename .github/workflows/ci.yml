@@ -70,6 +70,25 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      # Read out of the binary that was just built, not out of the config that
+      # was supposed to set them: a key electron-builder ignored leaves the
+      # config looking right and the app unprotected.
+      - name: Electron fuses are set in the built app
+        run: npm run check:fuses
+
+      # Starts the built application and drives it. Nothing else here notices a
+      # build that packages fine and does not start, or an integrity setting that
+      # makes the app refuse to run, and both look like a green build.
+      - name: The packaged app starts and holds its guards
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = "Linux" ]; then
+            # No display on the runner, and the sandbox helper needs setuid.
+            xvfb-run -a npm run smoke:packaged -- -- --no-sandbox --disable-gpu
+          else
+            npm run smoke:packaged
+          fi
+
       - uses: actions/upload-artifact@v7
         with:
           name: kaleido-${{ matrix.os }}
@@ -87,5 +106,5 @@ jobs:
   guards:
     uses: ./.github/workflows/guards.yml
     with:
-      # The interface ships its strings in five languages by design.
+      # The interface ships its strings in seven languages by design.
       language-excludes: "--exclude-dir=locales"
