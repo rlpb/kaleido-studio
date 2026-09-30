@@ -49,20 +49,25 @@ jobs:
       - name: Nothing that looks like a credential, in the tree or the history
         shell: bash
         run: |
-          pattern='sk-[A-Za-z0-9]{20,}|ghp_[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY'
+          pattern='sk-[A-Za-z0-9]{20,}|ghp_[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|GOCSPX-[A-Za-z0-9_-]{28}|-----BEGIN [A-Z ]*PRIVATE KEY'
 
           # Built in two pieces on purpose. Written whole, the fixture is a
           # string this very scan exists to catch, so a committed copy turns the
           # check red for good. That is how this was first learned.
-          printf 'AKIA%s' 'ABCDEFGHIJKLMNOP' > .credential-positive-control
-          proved=0
-          git grep --no-index -InE "$pattern" -- .credential-positive-control > /dev/null || proved=$?
-          rm -f .credential-positive-control
-          if [ "$proved" -ne 0 ]; then
-            echo "::error::the credential scan is broken: it did not match a known key"
-            exit 1
-          fi
-          echo "positive control matched"
+          # One control per kind of key: a pattern that matches some other key still
+          # leaves this one unproved. GOCSPX- is the format of a Google OAuth client
+          # secret, which is what a desktop app's developer is most likely to be handed.
+          for control in 'AKIA%s=ABCDEFGHIJKLMNOP' 'GOCSPX-%s=ABCDEFGHIJKLMNOPQRSTUVWXYZab'; do
+            printf "${control%%=*}" "${control#*=}" > .credential-positive-control
+            proved=0
+            git grep --no-index -InE "$pattern" -- .credential-positive-control > /dev/null || proved=$?
+            rm -f .credential-positive-control
+            if [ "$proved" -ne 0 ]; then
+              echo "::error::the credential scan is broken: it did not match a known key (${control%%=*})"
+              exit 1
+            fi
+          done
+          echo "positive controls matched"
 
           rc=0
           git grep -InE "$pattern" -- . || rc=$?
